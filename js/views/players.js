@@ -48,7 +48,10 @@ export async function playerView(root, id) {
   const played = rows.filter((r) => r.players[p.id] && r.players[p.id].minuti > 0);
   const trends = detectTrends(rows, [p]);
   const team = ctx.team;
-  const tcLine = (team?.tcStats?.marcatori || []).find((m) => m.playerId === p.id) || null;
+  // gol/assist ufficiali in tutte le squadre della società (alcuni ragazzi giocano anche con un'altra categoria)
+  const tcLines = (await db.all('teams')).flatMap((t) => (t.tcStats?.marcatori || []).filter((m) => m.playerId === p.id)
+    .map((m) => ({ ...m, team: t.name, aggiornato: t.tcStats.aggiornato, own: t.id === p.teamId })))
+    .sort((a, b) => b.own - a.own);
   const heat = mergeHeatmaps(played.flatMap((r) => r.tracking.filter((t) => t.playerId === p.id).map((t) => t.heatmap)));
   const pitch = played.flatMap((r) => r.tracking.filter((t) => t.playerId === p.id).map((t) => t.pitch)).find(Boolean);
   const hasTracking = tot.distanza != null;
@@ -75,7 +78,7 @@ export async function playerView(root, id) {
       ${tile('Palle perse', tot.perse)}${hasTracking ? tile('Km totali', num(tot.distanza / 1000, 1)) + tile('Vel. max', num(tot.velMax, 1)) : ''}
     </div>
 
-    ${tcLine ? `<div class="card small">📊 <strong>Tuttocampo</strong> (al ${esc(fmtDate(team.tcStats.aggiornato))}): <strong>${tcLine.gol}</strong> gol${tcLine.rigori ? ` (${tcLine.rigori} su rigore)` : ''}, <strong>${tcLine.assist}</strong> assist</div>` : ''}
+    ${tcLines.length ? `<div class="card small">📊 <strong>Tuttocampo</strong> (al ${esc(fmtDate(tcLines[0].aggiornato))})${tcLines.map((l) => `<div class="mt">${esc(l.team)}: <strong>${l.gol}</strong> gol${l.rigori ? ` (${l.rigori} su rigore)` : ''}, <strong>${l.assist}</strong> assist</div>`).join('')}</div>` : ''}
 
     ${trends.length ? `<h2 class="section">Tendenze ultime 3 partite</h2><div class="list">${trends.map((t) => `<div class="item"><span class="trend ${t.better ? 'up' : 'down'}">${t.better ? '▲' : '▼'}</span><div class="grow">${esc(t.label)}<div class="muted small">${esc(t.text)}</div></div></div>`).join('')}</div>` : ''}
 

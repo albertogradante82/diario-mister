@@ -54,6 +54,7 @@ export function misterLogin() {
       markUnlocked();
       write('mister');
       let data = null;
+      await db.setMeta('clubCode', input.value.trim());
       if (!(await db.all('teams')).length) {
         try { data = await fetchClubData(input.value); } catch { toast('Dati della società non disponibili: potrai caricarli da Altro.', 4000); }
       }

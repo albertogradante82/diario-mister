@@ -1,6 +1,6 @@
 import * as db from '../db.js';
 import { chooseFileAsAdmin } from '../admin.js';
-import { unlockClubData } from '../clubdata.js';
+import { unlockClubData, checkClubUpdate } from '../clubdata.js';
 import { setRole, misterLogin, logout } from '../roles.js';
 import { esc, on, toast, confirmDialog, pick, shareOrDownload, chooseFile, readText, fullName, sheet, $ } from '../util.js';
 import { setHeader, setCurrent, route, loadSeason, state, byNumber, APP_VERSION, checkForUpdate } from '../app.js';
@@ -273,7 +273,16 @@ async function restoreBackup() {
 
 export async function loadClubData() {
   const data = await unlockClubData();
-  if (data) await mergeRose(data);
+  if (data) { sessionStorage.removeItem('clubUpdate'); await mergeRose(data); }
+}
+
+/** All'avvio del mister: scarica da solo i dati della società aggiornati (risultati, classifiche, marcatori). */
+export async function autoUpdateClubData() {
+  const r = await checkClubUpdate();
+  if (!r) return;
+  if (r.needCode) { sessionStorage.setItem('clubUpdate', '1'); if (/^#\/home$|^$/.test(location.hash)) route(); return; }
+  await mergeRose(r.data, { silent: true });
+  toast('Dati della società aggiornati (risultati, classifiche, marcatori)', 3500);
 }
 
 // ---------- Importazione rose (unione, non sostituzione) ----------
@@ -291,7 +300,7 @@ async function importRose() {
 }
 
 /** Aggiunge squadre, stagioni e giocatori. I dati già presenti (es. numeri inseriti a mano) hanno la precedenza. */
-async function mergeRose(json) {
+export async function mergeRose(json, { silent = false } = {}) {
   const teams = json.data.teams || [], seasons = json.data.seasons || [], players = json.data.players || [];
   const matches = json.data.matches || [], events = json.data.events || [];
   // le partite devono appartenere a una squadra/stagione presente nel file o già nell'app
@@ -304,7 +313,7 @@ async function mergeRose(json) {
     ...[...new Set(matches.map((m) => m.teamId))].map((tid) => `• ${allTeams.find((t) => t.id === tid)?.name || 'Squadra'}: ${matches.filter((m) => m.teamId === tid).length} partite`),
   ];
   const what = [teams.length && `${teams.length} squadre`, players.length && `${players.length} giocatori`, matches.length && `${matches.length} partite`, events.length && `${events.length} eventi (gol)`].filter(Boolean).join(', ');
-  if (!(await confirmDialog(`Importare ${what}?\n${lines.join('\n')}\n\nI dati già presenti non vengono cancellati.`, 'Importa'))) return;
+  if (!silent && !(await confirmDialog(`Importare ${what}?\n${lines.join('\n')}\n\nI dati già presenti non vengono cancellati.`, 'Importa'))) return;
   const filled = (v) => v !== '' && v != null && !(Array.isArray(v) && !v.length);
   const merge = (imp, cur) => {
     if (!cur) return imp;
@@ -338,6 +347,10 @@ async function mergeRose(json) {
   // squadra iniziale: preferibilmente una con il calendario già caricato
   const first = teams.find((t) => matches.some((m) => m.teamId === t.id)) || teams[0];
   if (!state.teamId && first) await setCurrent(first.id, seasons.find((s) => s.teamId === first.id)?.id || null);
+  if (silent) {
+    if (!/\/(modifica|nuovo|nuova|live)$/.test(location.hash) && !document.querySelector('.sheet-back')) route();
+    return;
+  }
   toast(`Importati: ${what}`);
   location.hash = '#/home';
   route();

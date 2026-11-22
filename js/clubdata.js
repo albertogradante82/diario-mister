@@ -2,6 +2,7 @@
 // Si sbloccano con il codice amministratore: senza codice il file non è leggibile.
 import { sheet, toast } from './util.js';
 import { markUnlocked } from './admin.js';
+import * as db from './db.js';
 
 const URL_DATA = './dati/societa.enc.json';
 
@@ -19,9 +20,41 @@ async function decrypt(pkg, code) {
 
 /** Scarica e decifra i dati della società con un codice già noto (lancia un errore se errato). */
 export async function fetchClubData(code) {
+  const pkg = await fetchPkg();
+  const data = await decrypt(pkg, code);
+  await remember(code, pkg);
+  return data;
+}
+
+async function fetchPkg() {
   const r = await fetch(URL_DATA, { cache: 'no-cache' });
   if (!r.ok) throw new Error('Dati della società non disponibili');
-  return decrypt(await r.json(), code);
+  return r.json();
+}
+
+/** Ricorda (solo su questo telefono) la versione caricata e il codice, per gli aggiornamenti automatici. */
+async function remember(code, pkg) {
+  await db.setMeta('clubCode', code.trim());
+  await db.setMeta('clubDataIv', pkg.iv);
+}
+
+/**
+ * Controlla se sono stati pubblicati dati più recenti della società.
+ * Restituisce { data } se aggiornati automaticamente, { needCode: true } se serve la password, oppure null.
+ */
+export async function checkClubUpdate() {
+  let pkg;
+  try { pkg = await fetchPkg(); } catch { return null; }
+  if ((await db.getMeta('clubDataIv')) === pkg.iv) return null;
+  const code = await db.getMeta('clubCode');
+  if (!code) return { needCode: true };
+  try {
+    const data = await decrypt(pkg, code);
+    await remember(code, pkg);
+    return { data };
+  } catch {
+    return { needCode: true };
+  }
 }
 
 /** Chiede il codice, decifra e restituisce i dati della società (oppure null se annullato). */
@@ -51,6 +84,7 @@ export async function unlockClubData() {
       btn.textContent = 'Verifica…';
       try {
         const data = await decrypt(pkg, input.value);
+        await remember(input.value, pkg);
         markUnlocked();
         close(data);
       } catch {

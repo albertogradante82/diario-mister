@@ -7,7 +7,7 @@ import { analysisView } from './views/analysis.js';
 import { calendarView } from './views/calendar.js';
 import { homeView } from './views/home.js';
 import { playerCalendarView, playerRosterView, playerScorersView } from './views/player.js';
-import { roleChoiceView } from './views/more.js';
+import { roleChoiceView, autoUpdateClubData } from './views/more.js';
 import { getRole, logout } from './roles.js';
 import { confirmDialog } from './util.js';
 import { moreView, teamEditView, onboardingView } from './views/more.js';
@@ -217,7 +217,7 @@ function setTab(tab) {
 
 // ---------- Avvio ----------
 
-export const APP_VERSION = '1.8.3';
+export const APP_VERSION = '1.9.0';
 let swReg = null;
 
 /** Controlla subito se c'è una versione nuova dell'app; restituisce true se è stata trovata. */
@@ -262,6 +262,10 @@ window.addEventListener('DOMContentLoaded', async () => {
   });
   route();
   sync.start();
+  // il mister riceve da solo i dati aggiornati della società
+  const checkClub = async () => { if ((await getRole()) === 'mister') autoUpdateClubData().catch(() => {}); };
+  setTimeout(checkClub, 1500);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkClub(); });
   db.requestPersistence();
   if ('serviceWorker' in navigator) {
     try {

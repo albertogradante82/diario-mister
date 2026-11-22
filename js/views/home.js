@@ -1,6 +1,7 @@
 import * as db from '../db.js';
 import { esc, fmtDate, today, fullName, avatar } from '../util.js';
 import { setHeader, loadSeason, setCurrent } from '../app.js';
+import { loadClubData } from './more.js';
 import { seasonData, seasonTotals, detectTrends } from '../stats.js';
 
 /** Home: riepilogo della squadra selezionata e della società. */
@@ -44,7 +45,8 @@ export async function homeView(root) {
     return n === 0 ? 'oggi' : n === 1 ? 'domani' : `tra ${n} giorni`;
   };
 
-  root.innerHTML = `
+  const updBanner = sessionStorage.getItem('clubUpdate') ? `<button class="choice choice-main" id="clubupd"><span class="choice-icon">🔄</span><span><strong>Nuovi risultati e classifiche disponibili</strong><small>Tocca per aggiornare i dati del Calcio Palazzo.</small></span></button>` : '';
+  root.innerHTML = `${updBanner}
     ${next ? `
     <div class="card next-match ${live ? 'is-live' : ''}">
       <div class="small muted">${live ? '<span class="badge live">LIVE</span>' : `Prossima partita · <strong>${daysTo(next.date)}</strong>`}</div>
@@ -108,6 +110,8 @@ export async function homeView(root) {
       <a class="quick-btn" href="#/altro"><span>📂</span>Importa / backup</a>
     </div>`;
 
+  const ub = root.querySelector('#clubupd');
+  if (ub) ub.onclick = loadClubData;
   root.querySelectorAll('[data-m]').forEach((b) => (b.onclick = async () => {
     const m = allMatches.find((x) => x.id === b.dataset.m);
     await setCurrent(m.teamId, m.seasonId);

@@ -2,6 +2,7 @@ import { esc, fullName, shortDate, num, pct, ROLES, $, $$ } from '../util.js';
 import { setHeader, loadSeason } from '../app.js';
 import { seasonData, seasonTotals, per90, playerSeries, METRICS, detectTrends, detectTeamTrends } from '../stats.js';
 import { lineChart, barChart, hBars, PALETTE } from '../charts.js';
+import { standingsCard } from './home.js';
 
 const TABS = [['andamento', 'Andamento'], ['ruoli', 'Ruoli'], ['per90', 'Per 90′'], ['tempi', 'Tempi'], ['tendenze', 'Tendenze']];
 const PERIOD_NAMES = ['1° tempo', '2° tempo', '3° tempo'];
@@ -13,14 +14,17 @@ export async function analysisView(root) {
   const players = ctx.players;
   const totals = Object.fromEntries(players.map((p) => [p.id, seasonTotals(rows, p.id)]));
   const hasTracking = rows.some((r) => r.tracking.length);
-  let tab = sessionStorage.getItem('anTab') || 'andamento';
+  const tc = ctx.team?.tcStats || null;
+  const tabs = tc ? [['campionato', 'Campionato'], ...TABS] : TABS;
+  let tab = sessionStorage.getItem('anTab') || (tc ? 'campionato' : 'andamento');
+  if (!tabs.some(([k]) => k === tab)) tab = tabs[0][0];
 
-  if (!rows.length) {
+  if (!rows.length && !tc) {
     root.innerHTML = `<div class="empty"><div class="empty-icon">📊</div><p>Le analisi compariranno dopo aver registrato almeno una partita.</p></div>`;
     return;
   }
 
-  root.innerHTML = `<div class="tabs" id="atabs">${TABS.map(([k, l]) => `<button data-tab="${k}" class="${k === tab ? 'active' : ''}">${l}</button>`).join('')}</div><div id="pane"></div>`;
+  root.innerHTML = `<div class="tabs" id="atabs">${tabs.map(([k, l]) => `<button data-tab="${k}" class="${k === tab ? 'active' : ''}">${l}</button>`).join('')}</div><div id="pane"></div>`;
   const pane = $('#pane', root);
   $$('#atabs button', root).forEach((b) => (b.onclick = () => {
     tab = b.dataset.tab;
@@ -34,7 +38,23 @@ export async function analysisView(root) {
   const active = players.filter((p) => totals[p.id].minuti > 0);
 
   function draw() {
-    ({ andamento, ruoli, per90: per90Tab, tempi, tendenze })[tab]();
+    if (tab !== 'campionato' && !rows.length) { pane.innerHTML = '<div class="empty"><p>Nessuna partita registrata per questa analisi.</p></div>'; return; }
+    ({ campionato, andamento, ruoli, per90: per90Tab, tempi, tendenze })[tab]();
+  }
+
+  // ---- Campionato (dati ufficiali Tuttocampo) ----
+  function campionato() {
+    const played = rows.filter((r) => r.match.status === 'finita');
+    const scorers = (tc.marcatori || []).filter((m) => m.gol > 0).sort((a, b) => b.gol - a.gol);
+    const assists = (tc.marcatori || []).filter((m) => m.assist > 0).sort((a, b) => b.assist - a.assist);
+    const pname = (m) => { const p = players.find((x) => x.id === m.playerId); return p ? fullName(p) : m.name; };
+    pane.innerHTML = `${standingsCard(tc)}
+      ${played.length ? `<h2 class="section">Gol fatti e subiti per partita</h2><div class="card">${barChart({
+        groups: played.map((r) => shortDate(r.match.date)),
+        series: [{ name: 'Fatti', values: played.map((r) => r.score.fatti), color: PALETTE[2] }, { name: 'Subiti', values: played.map((r) => r.score.subiti), color: PALETTE[6] }],
+      })}</div>` : ''}
+      ${scorers.length ? `<h2 class="section">Marcatori</h2><div class="card">${hBars(scorers.map((m) => ({ label: pname(m), value: m.gol, display: `${m.gol}${m.rigori ? ` (${m.rigori} rig.)` : ''}` })), { color: PALETTE[2] })}</div>` : ''}
+      ${assists.length ? `<h2 class="section">Assist</h2><div class="card">${hBars(assists.map((m) => ({ label: pname(m), value: m.assist, display: String(m.assist) })))}</div>` : ''}`;
   }
 
   // ---- Andamento: un grafico per giocatori selezionati ----

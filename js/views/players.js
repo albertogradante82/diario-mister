@@ -4,7 +4,7 @@ import { setHeader, loadSeason, state, route } from '../app.js';
 import { seasonData, seasonTotals, per90, playerSeries, METRICS, numberAt, detectTrends } from '../stats.js';
 import { lineChart, pitchHeatmap, mergeHeatmaps } from '../charts.js';
 import { exportPlayerPdf } from '../pdf.js';
-import { listProfiles, getPhoto, privateProfiles, resetPin } from '../profiles.js';
+import { listProfiles, getPhoto, privateProfiles, resetPin, eraseProfile } from '../profiles.js';
 
 // ---------- Rosa ----------
 
@@ -312,7 +312,7 @@ async function showRemoteProfile(el, p) {
         <div class="muted">Inviati il ${esc(new Date(pub.updatedAt).toLocaleString('it-IT'))}</div></div></div>
       <div class="row gap mt">
         ${diff ? '<button class="btn small primary grow" id="applyRemote">Copia nel profilo</button>' : '<span class="muted grow">Profilo già aggiornato ✅</span>'}
-        ${code ? '<button class="btn small" id="resetPin">Azzera PIN</button>' : ''}
+        ${code ? '<button class="btn small" id="resetPin">Azzera PIN</button><button class="btn small danger" id="eraseProf">Cancella scheda</button>' : ''}
       </div>
     </div>`;
   const ap = el.querySelector('#applyRemote');
@@ -324,6 +324,11 @@ async function showRemoteProfile(el, p) {
     await db.put('players', p);
     toast('Profilo aggiornato con i dati del giocatore');
     route();
+  };
+  const ep = el.querySelector('#eraseProf');
+  if (ep) ep.onclick = async () => {
+    if (!(await confirmDialog(`Cancellare la scheda compilata da ${fullName(p)} (foto, data di nascita, cellulare, email, PIN)? Usalo se lo chiede la famiglia.`, 'Cancella', true))) return;
+    try { await eraseProfile(p.id, { adminCode: code }); toast('Scheda cancellata'); route(); } catch (e) { toast(e.message, 4000); }
   };
   const rp = el.querySelector('#resetPin');
   if (rp) rp.onclick = async () => {

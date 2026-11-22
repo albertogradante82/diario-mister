@@ -4,6 +4,8 @@ import { listProfiles, getPhoto, saveProfile, myPrivate, fillPhotos } from '../p
 import { sheet } from '../util.js';
 import { exportPublicPlayerPdf } from '../pdf.js';
 import { buildLeaderboard, renderLeaderboard } from './leaderboard.js';
+import { PRIVACY_VERSION, showPrivacy } from '../privacy.js';
+import { eraseProfile } from '../profiles.js';
 import { setHeader } from '../app.js';
 import { PALETTE } from '../charts.js';
 
@@ -267,10 +269,14 @@ export async function playerProfileEditView(root, id) {
         <div class="card">
           <label>${pr.updatedAt ? 'Il tuo PIN' : 'Scegli un PIN di 4-6 cifre'} <input type="password" name="pin" inputmode="numeric" pattern="[0-9]{4,6}" maxlength="6" required autocomplete="off"></label>
           <p class="small muted">${pr.updatedAt ? 'Il PIN che hai scelto la prima volta. Se l\'hai dimenticato chiedi al mister di azzerarlo.' : 'Servirà per modificare la scheda in futuro: così nessun altro può cambiarla. Ricordatelo!'}</p>
-          <label class="switch small mt" style="white-space:normal"><input type="checkbox" name="consent" required> Sono il giocatore, oppure il genitore/tutore se minorenne, e acconsento a condividere questi dati con la società ASD Calcio Palazzo.</label>
+          <div class="consent-box mt">
+            <label class="consent-row"><input type="checkbox" name="consent" required>
+              <span>Ho letto l'<a href="#" id="openPrivacy">informativa privacy</a> e acconsento al trattamento dei dati. <strong>Se il giocatore ha meno di 14 anni</strong>, la spunta va messa da un genitore o tutore. <span class="req">*obbligatorio</span></span></label>
+          </div>
         </div>
         <button class="btn primary block" id="send">Invia</button>
       </form>`;
+    $('#openPrivacy', root).onclick = (e) => { e.preventDefault(); showPrivacy(); };
     $('#photo', root).onchange = async (e) => {
       const file = e.target.files[0];
       if (!file) return;
@@ -284,7 +290,8 @@ export async function playerProfileEditView(root, id) {
       const btn = $('#send', root);
       btn.disabled = true; btn.textContent = 'Invio…';
       try {
-        const r = await saveProfile({ id, pin: fd.get('pin'), birthDate: fd.get('birthDate'), phone: fd.get('phone'), email: fd.get('email'), consent: fd.get('consent') === 'on', ...(photo !== undefined ? { photo } : {}) });
+        if (fd.get('consent') !== 'on') { toast('Per inviare la scheda devi accettare l\'informativa privacy.', 3500); btn.disabled = false; btn.textContent = 'Invia'; return; }
+        const r = await saveProfile({ id, pin: fd.get('pin'), birthDate: fd.get('birthDate'), phone: fd.get('phone'), email: fd.get('email'), consent: true, privacyVersion: PRIVACY_VERSION, ...(photo !== undefined ? { photo } : {}) });
         toast(r.newPin ? 'Scheda inviata! Ricorda il tuo PIN.' : 'Scheda aggiornata!', 3500);
         location.hash = `#/g/giocatore/${id}`;
       } catch (err) {
@@ -301,6 +308,36 @@ export async function playerMoreView(root) {
   root.innerHTML = `<div class="list">
     <a class="item" href="#/g/rose"><span style="font-size:24px">👥</span><div class="grow"><strong>Squadre e schede giocatori</strong><div class="muted small">Rose con foto · compila la tua scheda</div></div><span class="chev">›</span></a>
     <a class="item" href="#/g/marcatori"><span style="font-size:24px">🏆</span><div class="grow"><strong>Classifiche e marcatori</strong><div class="muted small">Campionati e classifica di tutte le giovanili</div></div><span class="chev">›</span></a>
+    <button class="item" id="privacy"><span style="font-size:24px">🔒</span><div class="grow"><strong>Privacy</strong><div class="muted small">Informativa · cancella la mia scheda</div></div><span class="chev">›</span></button>
     <a class="item" href="#/g/esci"><span style="font-size:24px">🚪</span><div class="grow"><strong>Esci</strong><div class="muted small">Torna alla scelta dell'accesso</div></div><span class="chev">›</span></a>
   </div>`;
+  $('#privacy', root).onclick = privacyMenu;
+}
+
+async function privacyMenu() {
+  const choice = await sheet('Privacy', (body, close) => {
+    body.innerHTML = `<div class="list">
+      <button class="item" data-c="read"><span style="font-size:22px">📄</span><div class="grow"><strong>Leggi l'informativa privacy</strong></div><span class="chev">›</span></button>
+      <button class="item" data-c="erase"><span style="font-size:22px">🗑️</span><div class="grow"><strong class="ko">Cancella la mia scheda</strong><div class="muted small">Foto, data di nascita, cellulare ed email. Serve il PIN.</div></div><span class="chev">›</span></button></div>`;
+    body.querySelectorAll('[data-c]').forEach((b) => (b.onclick = () => close(b.dataset.c)));
+  });
+  if (choice === 'read') return showPrivacy();
+  if (choice !== 'erase') return;
+  const pub = await fetch('./dati/pubblico.json').then((r) => r.json());
+  const done = await sheet('Cancella la mia scheda', (body, close) => {
+    body.innerHTML = `<form class="form" id="ef">
+      <label>Chi sei?<select name="id" required><option value="">—</option>${pub.players.slice().sort((a, b) => a.name.localeCompare(b.name)).map((p) => `<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select></label>
+      <label>Il tuo PIN<input name="pin" type="password" inputmode="numeric" maxlength="6" required class="code-input"></label>
+      <p class="small muted">Verranno cancellati foto, data di nascita, cellulare, email e PIN. Le statistiche sportive della squadra restano. Il PIN dimenticato? Chiedi al mister di cancellarla per te.</p>
+      <button class="btn danger block">Cancella definitivamente</button></form>`;
+    body.querySelector('#ef').onsubmit = async (e) => {
+      e.preventDefault();
+      const f = new FormData(e.target);
+      try { await eraseProfile(f.get('id'), { pin: f.get('pin') }); close(f.get('id')); } catch (err) { toast(err.message, 4000); }
+    };
+  });
+  if (done) {
+    try { const me = JSON.parse(localStorage.getItem('mister-me') || 'null'); if (me && me.id === done) localStorage.removeItem('mister-me'); } catch { /* */ }
+    toast('Scheda cancellata.', 3500);
+  }
 }

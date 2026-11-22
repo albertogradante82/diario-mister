@@ -120,7 +120,8 @@ module.exports = async function handler(req, res) {
       const pin = String(body.pin || '').trim();
       if (!ID_RE.test(id)) return send(res, 400, { error: 'Giocatore non valido.' });
       if (!/^\d{4,6}$/.test(pin)) return send(res, 400, { error: 'Il PIN deve avere da 4 a 6 cifre.' });
-      if (body.consent !== true) return send(res, 400, { error: 'Serve il consenso al trattamento dei dati.' });
+      if (body.consent !== true) return send(res, 400, { error: 'Devi accettare l\'informativa privacy.' });
+      const consent = { version: String(body.privacyVersion || '').slice(0, 20), at: Date.now(), ip: ip(req) };
       if (await limited(cfg, `rl:pin:${id}`, 10, 3600)) return send(res, 429, { error: 'Troppi tentativi con il PIN: riprova tra un\'ora o chiedi al mister di azzerarlo.' });
       const [stored, oldPubRaw] = await pipeline(cfg, [['HGET', 'prof:pin', id], ['HGET', 'prof:pub', id]]);
       if (stored && !safeEq(stored, pinHash(id, pin))) return send(res, 403, { error: 'PIN errato. Se l\'hai dimenticato chiedi al mister di azzerarlo.' });
@@ -131,7 +132,7 @@ module.exports = async function handler(req, res) {
       const hasPhoto = data.photo === undefined ? !!oldPub.hasPhoto : !!data.photo;
       const cmds = [
         ['HSET', 'prof:pub', id, JSON.stringify({ birthDate: data.birthDate || '', hasPhoto, updatedAt: now })],
-        ['HSET', 'prof:priv', id, JSON.stringify({ phone: data.phone, email: data.email, updatedAt: now })],
+        ['HSET', 'prof:priv', id, JSON.stringify({ phone: data.phone, email: data.email, updatedAt: now, consent })],
       ];
       if (!stored) cmds.push(['HSET', 'prof:pin', id, pinHash(id, pin)]);
       if (data.photo) cmds.push(['HSET', 'prof:photo', id, data.photo]);
@@ -149,6 +150,20 @@ module.exports = async function handler(req, res) {
       if (!stored) return send(res, 404, { error: 'Prima compila la tua scheda e scegli un PIN.' });
       if (!safeEq(stored, pinHash(id, String(pin)))) return send(res, 403, { error: 'PIN errato.' });
       return send(res, 200, { priv: priv ? JSON.parse(priv) : {} });
+    }
+
+    if (req.method === 'POST' && action === 'erase') {
+      // diritto alla cancellazione: il giocatore (con PIN) o l'amministratore cancellano la scheda
+      const { id, pin } = await readBody(req);
+      if (!ID_RE.test(String(id))) return send(res, 400, { error: 'Id non valido' });
+      if (!isAdmin(req)) {
+        if (!/^\d{4,6}$/.test(String(pin || ''))) return send(res, 400, { error: 'PIN non valido.' });
+        if (await limited(cfg, `rl:pin:${id}`, 10, 3600)) return send(res, 429, { error: 'Troppi tentativi con il PIN.' });
+        const [stored] = await pipeline(cfg, [['HGET', 'prof:pin', id]]);
+        if (!stored || !safeEq(stored, pinHash(id, String(pin)))) return send(res, 403, { error: 'PIN errato.' });
+      }
+      await pipeline(cfg, [['HDEL', 'prof:pub', id], ['HDEL', 'prof:photo', id], ['HDEL', 'prof:priv', id], ['HDEL', 'prof:pin', id]]);
+      return send(res, 200, { ok: true });
     }
 
     if (req.method === 'POST' && action === 'resetpin') {

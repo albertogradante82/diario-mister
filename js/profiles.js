@@ -46,6 +46,13 @@ export async function serviceActive() {
   try { await call(`${API}?action=list`); return true; } catch (e) { return e.status !== 503 && e.status !== 404 ? true : false; }
 }
 
+/** Cancella la scheda (giocatore con PIN, oppure mister con la password). */
+export async function eraseProfile(id, { pin, adminCode } = {}) {
+  const r = await call(`${API}?action=erase`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(adminCode ? { 'x-admin-code': adminCode } : {}) }, body: JSON.stringify({ id, pin }) });
+  photoCache.delete(id);
+  return r;
+}
+
 /** Dati privati del giocatore, verificando il suo PIN. */
 export async function myPrivate(id, pin) {
   return (await call(`${API}?action=mine`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, pin }) })).priv || {};

@@ -32,8 +32,18 @@ function open() {
       make('meta');
       make('outbox'); // modifiche locali in attesa di invio all'archivio condiviso
     };
-    req.onsuccess = () => resolve(req.result);
+    req.onsuccess = () => {
+      const db = req.result;
+      // se un'altra copia dell'app (più nuova) deve aggiornare l'archivio, liberalo
+      db.onversionchange = () => { db.close(); dbPromise = null; location.reload(); };
+      resolve(db);
+    };
     req.onerror = () => reject(req.error);
+    // una copia vecchia dell'app aperta in background blocca l'aggiornamento dell'archivio
+    req.onblocked = () => {
+      const v = document.getElementById('view');
+      if (v) v.innerHTML = '<div class="card"><p><strong>Aggiornamento in corso</strong></p><p class="small">Chiudi del tutto l\'app (anche le altre finestre o schede aperte con l\'app) e riaprila.</p></div>';
+    };
   });
   return dbPromise;
 }

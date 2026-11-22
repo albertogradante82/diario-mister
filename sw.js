@@ -1,6 +1,6 @@
 // Service worker: rende l'app utilizzabile offline.
 // Ad ogni rilascio aumenta VERSION per far scaricare i file aggiornati.
-const VERSION = 'mister-v1.4.0';
+const VERSION = 'mister-v1.4.1';
 const ASSETS = [
   './',
   './index.html',
@@ -39,22 +39,29 @@ self.addEventListener('activate', (e) => {
   );
 });
 
-// Cache-first per i file dell'app (funziona senza rete), aggiornamento in background.
+// Rete prima di tutto (sempre la versione aggiornata, niente file vecchi mescolati ai nuovi);
+// se non c'è connessione si usa la copia salvata, così l'app funziona offline.
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   const url = new URL(req.url);
   // l'archivio condiviso va sempre letto dalla rete
   if (req.method !== 'GET' || url.origin !== location.origin || url.pathname.includes('/api/')) return;
-  e.respondWith(
-    caches.match(req, { ignoreSearch: true }).then((cached) => {
-      const network = fetch(req).then((res) => {
-        if (res && res.ok) {
-          const copy = res.clone();
-          caches.open(VERSION).then((c) => c.put(req, copy));
-        }
-        return res;
-      }).catch(() => cached || (req.mode === 'navigate' ? caches.match('./index.html') : undefined));
-      return cached || network;
-    }),
-  );
+  e.respondWith((async () => {
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 4000);
+      const res = await fetch(req, { cache: 'no-cache', signal: ctrl.signal });
+      clearTimeout(timer);
+      if (res && res.ok) {
+        const copy = res.clone();
+        caches.open(VERSION).then((c) => c.put(req, copy));
+      }
+      return res;
+    } catch {
+      const cached = await caches.match(req, { ignoreSearch: true });
+      if (cached) return cached;
+      if (req.mode === 'navigate') return caches.match('./index.html');
+      throw new Error('offline');
+    }
+  })());
 });

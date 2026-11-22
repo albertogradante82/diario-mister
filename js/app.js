@@ -122,7 +122,6 @@ export async function route() {
   const { team, season } = await loadCurrent();
   if (my !== navToken) return;
   document.body.classList.toggle('live-mode', /\/live$/.test(hash));
-  document.body.classList.toggle('onboarding', (!team || !season) && !/^#\/squadra\//.test(hash));
 
   const run = async (fn, args, tab) => {
     const box = document.createElement('div');
@@ -140,10 +139,12 @@ export async function route() {
     cleanup = clean;
   };
 
-  if ((!team || !season) && !/^#\/squadra\//.test(hash)) {
-    setHeader({ title: 'Benvenuto' });
+  // Nessuna squadra ancora: la Home mostra le scelte per iniziare; Altro e Calendario restano usabili
+  if ((!team || !season) && !/^#\/(squadra\/|altro$|calendario$)/.test(hash)) {
+    const tab = (hash.match(/^#\/(home|partite|rosa|analisi)/) || [])[1] || 'home';
+    setHeader({ title: tab === 'home' ? 'Home' : 'Benvenuto' });
     $('#ctx').innerHTML = '';
-    await run(onboardingView, [team], null);
+    await run(onboardingView, [team, tab], tab);
     return;
   }
   await renderContext();
@@ -164,7 +165,7 @@ function setTab(tab) {
 
 // ---------- Avvio ----------
 
-export const APP_VERSION = '1.5.1';
+export const APP_VERSION = '1.5.2';
 let swReg = null;
 
 /** Controlla subito se c'è una versione nuova dell'app; restituisce true se è stata trovata. */

@@ -14,8 +14,10 @@ export function defaultSeasonName() {
 
 // ---------- Primo avvio ----------
 
-export async function onboardingView(root) {
-  root.innerHTML = `
+export async function onboardingView(root, _team, tab = 'home') {
+  const notice = tab !== 'home'
+    ? `<div class="card warn-card small">Per vedere ${tab === 'rosa' ? 'la rosa' : tab === 'partite' ? 'le partite' : 'le analisi'} carica prima almeno una squadra.</div>` : '';
+  root.innerHTML = `${notice}
     <div class="hero">
       <img class="hero-logo" src="icons/logo-palazzo.png" alt="Calcio Palazzo">
       <h1>Diario del Mister</h1>

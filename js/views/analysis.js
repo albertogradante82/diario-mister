@@ -21,7 +21,7 @@ export async function analysisView(root) {
   const tc = ctx.team?.tcStats || null;
   const allTeams = await db.all('teams');
   const hasClub = allTeams.some((t) => t.tcStats?.marcatori?.length);
-  const tabs = [...(tc ? [['campionato', 'Campionato']] : []), ...(hasClub ? [['giovanili', '🏆 Giovanili']] : []), ...TABS];
+  const tabs = [...(tc ? [['campionato', 'Campionato']] : []), ...(hasClub ? [['giovanili', '🏆 Classifiche']] : []), ...TABS];
   let tab = sessionStorage.getItem('anTab') || (tc ? 'campionato' : 'andamento');
   if (!tabs.some(([k]) => k === tab)) tab = tabs[0][0];
 
@@ -52,7 +52,14 @@ export async function analysisView(root) {
   // ---- Classifica di tutte le giovanili ----
   function giovanili() {
     const upd = allTeams.map((t) => t.tcStats?.aggiornato).filter(Boolean).sort().pop();
-    renderLeaderboard(pane, buildLeaderboard(allTeams), { link: (id) => `#/giocatore/${id}`, updated: upd ? fmtDate(upd) : '' });
+    const team = ctx.team;
+    const scope = team?.tcStats && sessionStorage.getItem('lbScope') === 'squadra' ? 'squadra' : 'tutte';
+    const header = team?.tcStats ? `<div class="seg"><label><input type="radio" name="lbscope" value="tutte" ${scope === 'tutte' ? 'checked' : ''}><span>🏆 Tutte le giovanili</span></label><label><input type="radio" name="lbscope" value="squadra" ${scope === 'squadra' ? 'checked' : ''}><span>${esc(team.name.replace(/ (Provinciali|Sperimentali|Regionali)$/i, ''))}</span></label></div>` : '';
+    pane.__bindHeader = (r) => r.querySelectorAll('input[name=lbscope]').forEach((i) => (i.onchange = () => { sessionStorage.setItem('lbScope', i.value); giovanili(); fillPhotos(pane); }));
+    renderLeaderboard(pane, buildLeaderboard(scope === 'squadra' ? [team] : allTeams), {
+      link: (id) => `#/giocatore/${id}`, updated: upd ? fmtDate(upd) : '', header,
+      note: scope === 'squadra' ? `Classifica interna ${team.name}` : '',
+    });
   }
 
   // ---- Campionato (dati ufficiali Tuttocampo) ----

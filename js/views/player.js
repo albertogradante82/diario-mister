@@ -147,12 +147,16 @@ export async function playerScorersView(root) {
             <tbody>${st.classifica.map((r) => `<tr class="${/palazzo/i.test(r.squadra) ? 'us' : ''} ${r.zona ? 'zona-' + r.zona : ''}"><td>${r.pos}</td><td>${esc(r.squadra)}</td><td><b>${r.pt}</b></td><td>${r.g}</td><td>${r.v}</td><td>${r.n}</td><td>${r.p}</td><td>${r.dr > 0 ? '+' : ''}${r.dr}</td></tr>`).join('')}</tbody>
           </table></div>${st.legenda ? `<p class="small">${Object.entries(st.legenda).map(([k, v]) => `<span class="zona-dot zona-${k}"></span> ${esc(v)}`).join(' &nbsp; ')}</p>` : ''}` : ''}
         ${st?.evidenza?.length ? `<h2 class="section">In evidenza</h2><div class="list">${st.evidenza.map((t) => `<div class="item small">🔥 ${esc(t)}</div>`).join('')}</div>` : ''}
-        <h2 class="section">Marcatori</h2>
-        ${scorers.length ? `<div class="list">${scorers.map((m, i) => `<div class="item"><span class="rank">${i + 1}</span>${m.id || m.playerId ? `<span class="avatar" style="width:38px;height:38px;font-size:14px" data-rphoto="${m.id || m.playerId}">${esc(m.name.split(' ').map((w) => w[0]).join('').slice(0, 2))}</span>` : ''}<div class="grow">${esc(m.name)}</div><strong>${m.gol}</strong><span class="muted small">gol${m.rig ? ` (${m.rig} rig.)` : ''}</span></div>`).join('')}</div>`
-          : '<div class="empty"><div class="empty-icon">⚽</div><p>Ancora nessun gol registrato per questa squadra.</p></div>'}
-        ${assists.length ? `<h2 class="section">Assist</h2><div class="list">${assists.map((m, i) => `<div class="item"><span class="rank">${i + 1}</span>${m.id || m.playerId ? `<span class="avatar" style="width:38px;height:38px;font-size:14px" data-rphoto="${m.id || m.playerId}">${esc(m.name.split(' ').map((w) => w[0]).join('').slice(0, 2))}</span>` : ''}<div class="grow">${esc(m.name)}</div><strong>${m.assist}</strong><span class="muted small">assist</span></div>`).join('')}</div>` : ''}
+        <h2 class="section">Classifica della squadra · gol e assist</h2>
+        <div id="lbteam"></div>
         ${st ? `<p class="small muted">Fonte: ${esc(st.fonte || 'Tuttocampo')}, aggiornata al ${esc(fmtDate(st.aggiornato))}.</p>` : ''}`;
       bindPicker(root, draw);
+      const lbt = root.querySelector('#lbteam');
+      if (lbt) {
+        const list = buildLeaderboard([team]);
+        if (list.length) renderLeaderboard(lbt, list, { link: (id) => `#/g/giocatore/${id}`, note: `Classifica interna ${team.name}` });
+        else lbt.innerHTML = '<div class="empty"><div class="empty-icon">⚽</div><p>Ancora nessun gol registrato per questa squadra.</p></div>';
+      }
       fillPhotos(root);
     };
     draw();

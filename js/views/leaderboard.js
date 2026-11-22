@@ -30,14 +30,14 @@ const SORTS = {
 };
 
 /** Disegna la classifica in root. link(id) → href del profilo (o null). */
-export function renderLeaderboard(root, list, { link = () => null, updated = '' } = {}) {
+export function renderLeaderboard(root, list, { link = () => null, updated = '', header = '', note = '' } = {}) {
   let sort = sessionStorage.getItem('lbSort') || 'totale';
   const short = (n) => n.replace(/ (Provinciali|Sperimentali|Regionali)$/i, '');
   const draw = () => {
     const rows = list.filter((r) => (sort === 'gol' ? r.gol : sort === 'assist' ? r.assist : r.gol + r.assist) > 0).sort(SORTS[sort][1]);
     let pos = 0, prev = null;
     const val = (r) => (sort === 'gol' ? r.gol : sort === 'assist' ? r.assist : r.gol + r.assist);
-    root.innerHTML = `
+    root.innerHTML = `${header}
       <div class="seg">${Object.entries(SORTS).map(([k, [l]]) => `<label><input type="radio" name="lbs" value="${k}" ${k === sort ? 'checked' : ''}><span>${l}</span></label>`).join('')}</div>
       ${rows.length ? `<div class="list">${rows.map((r, i) => {
         if (val(r) !== prev) { pos = i + 1; prev = val(r); }
@@ -51,7 +51,8 @@ export function renderLeaderboard(root, list, { link = () => null, updated = '' 
           <div class="lb-nums"><div><b>${r.gol}</b><small>gol</small></div><div><b>${r.assist}</b><small>ast</small></div><div class="lb-tot"><b>${r.gol + r.assist}</b><small>tot</small></div></div>
         </${href ? 'a' : 'div'}>`;
       }).join('')}</div>` : '<div class="empty"><p>Ancora nessun dato.</p></div>'}
-      <p class="small muted">Tutte le squadre del Calcio Palazzo · fonte Tuttocampo${updated ? `, aggiornata al ${esc(updated)}` : ''}. Chi ha giocato in più squadre ha i numeri sommati.</p>`;
+      <p class="small muted">${note || 'Tutte le squadre del Calcio Palazzo'} · fonte Tuttocampo${updated ? `, aggiornata al ${esc(updated)}` : ''}.${note ? '' : ' Chi ha giocato in più squadre ha i numeri sommati.'}</p>`;
+    if (root.__bindHeader) root.__bindHeader(root);
     root.querySelectorAll('input[name=lbs]').forEach((i) => (i.onchange = () => { sort = i.value; sessionStorage.setItem('lbSort', sort); draw(); }));
     fillPhotos(root);
   };

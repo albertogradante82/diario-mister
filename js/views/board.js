@@ -3,6 +3,7 @@ import * as db from '../db.js';
 import { esc, fmtDate, toast, sheet, confirmDialog, fullName, $, $$ } from '../util.js';
 import { setHeader, route } from '../app.js';
 import { listProfiles, fillPhotos } from '../profiles.js';
+import { playerConvocationsBlock } from './convocazioni.js';
 
 const API = './api/bacheca';
 const KINDS = { comunicazione: ['📢', 'Comunicazione'], allenamento: ['🏃', 'Allenamento'], evento: ['🎉', 'Evento'], partita: ['⚽', 'Partita'] };
@@ -62,6 +63,7 @@ export async function playerBoardView(root) {
   const mine = ident && pub.players.find((p) => p.id === ident.id);
   const list = mine ? items.filter((n) => !n.teams.length || n.teams.includes(mine.teamId)) : items;
   const s = seen();
+  const conv = await playerConvocationsBlock();
 
   root.innerHTML = `
     ${mine ? `<div class="card small row gap center"><span class="avatar" style="width:36px;height:36px" data-rphoto="${mine.id}">${esc(mine.name.split(' ').map((w) => w[0]).join('').slice(0, 2))}</span>
@@ -69,9 +71,12 @@ export async function playerBoardView(root) {
         <button class="btn-text small" id="unlink">Cambia</button></div>`
       : `<div class="card small"><strong>Chi sei?</strong> Collega il tuo profilo per vedere gli avvisi della tua squadra e far sapere al mister che li hai letti.
         <button class="btn primary block mt" id="link">🔗 Collega il mio profilo</button>
-        <p class="muted mt">Serve aver compilato la tua scheda giocatore (Squadre → il tuo nome) e il tuo PIN.</p></div>`}
-    ${list.length ? list.map((n) => noticeCard(n, teamName, { unread: !s.has(n.id) })).join('') : '<div class="empty"><div class="empty-icon">📣</div><p>Nessun avviso per ora.</p></div>'}`;
+        <p class="muted mt">Serve aver compilato la tua scheda giocatore (Squadre → il tuo nome) e il tuo PIN. Così vedi anche le <strong>convocazioni</strong> e puoi rispondere.</p></div>`}
+    ${conv.html}
+    ${conv.html && list.length ? '<h2 class="section">📣 Avvisi</h2>' : ''}
+    ${list.length ? list.map((n) => noticeCard(n, teamName, { unread: !s.has(n.id) })).join('') : conv.html ? '' : '<div class="empty"><div class="empty-icon">📣</div><p>Nessun avviso per ora.</p></div>'}`;
   fillPhotos(root);
+  conv.bind(root);
 
   // apertura/lettura: l'avviso è già visibile; lo segno come letto quando entra nello schermo
   const confirmRead = async (id) => {
@@ -128,7 +133,8 @@ export async function updateBadge() {
   if (ident) {
     try { teamId = (await fetch('./dati/pubblico.json').then((r) => r.json())).players.find((p) => p.id === ident.id)?.teamId; } catch { /* */ }
   }
-  const n = await unreadCount(teamId);
+  let n = await unreadCount(teamId);
+  if (ident) { try { n += (await playerConvocationsBlock()).pending; } catch { /* */ } }
   let b = tab.querySelector('.tab-badge');
   if (!n) { b?.remove(); return; }
   if (!b) { b = document.createElement('i'); b.className = 'tab-badge'; tab.appendChild(b); }

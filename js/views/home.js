@@ -3,6 +3,7 @@ import { esc, fmtDate, today, fullName, avatar } from '../util.js';
 import { setHeader, loadSeason, setCurrent } from '../app.js';
 import { loadClubData } from './more.js';
 import { listNotices } from './board.js';
+import { editConvocation } from './convocazioni.js';
 import { seasonData, seasonTotals, detectTrends } from '../stats.js';
 
 /** Home: riepilogo della squadra selezionata e della società. */
@@ -57,7 +58,7 @@ export async function homeView(root) {
       <div class="small muted">${esc(fmtDate(next.date, { weekday: 'long', day: 'numeric', month: 'long' }))}${next.time ? ' · ore ' + esc(next.time) : ''} · ${next.home === false ? 'trasferta' : 'in casa'}${next.round ? ' · ' + esc(next.round) : ''}</div>
       <div class="row gap mt">
         <a class="btn primary grow" href="#/partita/${next.id}/live">${live ? '▶ Continua live' : '▶ Avvia live'}</a>
-        <a class="btn grow" href="#/partita/${next.id}/modifica">Convocati</a>
+        <button class="btn grow" id="convnext">📋 Convoca</button>
       </div>
     </div>` : `
     <div class="card"><p class="muted">Nessuna partita in programma per ${esc(ctx.team?.name || 'questa squadra')}.</p>
@@ -112,6 +113,8 @@ export async function homeView(root) {
 
     <h2 class="section">Azioni rapide</h2>
     <div class="quick">
+      <a class="quick-btn" href="#/convocazioni"><span>📋</span>Convocazioni</a>
+      <a class="quick-btn" href="#/bacheca"><span>📣</span>Bacheca</a>
       <a class="quick-btn" href="#/partita/nuova"><span>➕</span>Nuova partita</a>
       <a class="quick-btn" href="#/giocatore/nuovo"><span>👤</span>Nuovo giocatore</a>
       <a class="quick-btn" href="#/calendario"><span>📆</span>Calendario</a>
@@ -119,6 +122,8 @@ export async function homeView(root) {
       <a class="quick-btn" href="#/altro"><span>📂</span>Importa / backup</a>
     </div>`;
 
+  const cn = root.querySelector('#convnext');
+  if (cn) cn.onclick = () => editConvocation(null, { code: null, match: next });
   const ub = root.querySelector('#clubupd');
   if (ub) ub.onclick = loadClubData;
   root.querySelectorAll('[data-m]').forEach((b) => (b.onclick = async () => {

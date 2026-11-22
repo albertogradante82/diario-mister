@@ -8,6 +8,7 @@ import {
 } from '../stats.js';
 import { barChart, pitchHeatmap } from '../charts.js';
 import { parseTracking, checkMeta } from '../tracking.js';
+import { editConvocation } from './convocazioni.js';
 
 const PERIOD_NAMES = ['1° tempo', '2° tempo', '3° tempo'];
 const COMPETITIONS = ['Campionato', 'Torneo', 'Amichevole', 'Coppa'];
@@ -191,6 +192,7 @@ export async function matchView(root, id) {
       <div class="mh-title">${esc(matchTitle(m, ctx.team))}</div>
       <div class="mh-score">${scoreLabel(m, s)}</div>
       <div class="muted small">${esc(m.status)} · ${n} ${n === 1 ? 'tempo' : 'tempi'} da ${m.periodMinutes}′</div>
+      <button class="btn block mt" id="convoca">📋 Convoca i ragazzi (rispondono dall'app)</button>
       <a class="btn primary block mt" href="#/partita/${id}/live">${m.status === 'finita' ? '✏️ Apri tagging eventi' : m.status === 'in corso' ? '▶ Continua live' : '▶ Avvia live'}</a>
     </div>
     <div class="tabs" id="tabs">
@@ -260,6 +262,7 @@ export async function matchView(root, id) {
       <button class="btn danger block mt" data-action="delTracking">Elimina dati di tracking</button>` : ''}
     </section>`;
 
+  $('#convoca', root).onclick = () => editConvocation(null, { code: null, match: m });
   $$('#tabs button', root).forEach((b) => (b.onclick = () => {
     sessionStorage.setItem('matchTab', b.dataset.tab);
     $$('#tabs button', root).forEach((x) => x.classList.toggle('active', x === b));

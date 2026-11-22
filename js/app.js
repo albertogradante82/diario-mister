@@ -8,6 +8,7 @@ import { analysisView } from './views/analysis.js';
 import { calendarView } from './views/calendar.js';
 import { homeView } from './views/home.js';
 import { playerBoardView, misterBoardView, updateBadge } from './views/board.js';
+import { misterConvView } from './views/convocazioni.js';
 import { playerCalendarView, playerRosterView, playerScorersView, playerProfileView, playerProfileEditView } from './views/player.js';
 import { roleChoiceView, autoUpdateClubData } from './views/more.js';
 import { getRole, logout } from './roles.js';
@@ -100,6 +101,7 @@ const routes = [
   [/^#\/partite$/, matchesView, 'partite'],
   [/^#\/calendario$/, calendarView, 'partite'],
   [/^#\/bacheca$/, misterBoardView, 'home'],
+  [/^#\/convocazioni$/, misterConvView, 'home'],
   [/^#\/partita\/nuova$/, (r) => matchEditView(r, null), 'partite'],
   [/^#\/partita\/([^/]+)\/modifica$/, (r, id) => matchEditView(r, id), 'partite'],
   [/^#\/partita\/([^/]+)\/live$/, liveView, 'partite'],
@@ -225,7 +227,7 @@ function setTab(tab) {
 
 // ---------- Avvio ----------
 
-export const APP_VERSION = '1.13.0';
+export const APP_VERSION = '1.14.0';
 let swReg = null;
 
 /** Controlla subito se c'è una versione nuova dell'app; restituisce true se è stata trovata. */

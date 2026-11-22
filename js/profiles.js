@@ -13,6 +13,8 @@ async function call(url, opts = {}) {
 
 /** { id: { birthDate, hasPhoto, updatedAt } } – oppure {} se il servizio non è attivo. */
 export async function listProfiles() {
+  // ad ogni lettura dell'elenco dimentico le foto già viste, così una foto nuova compare subito
+  photoCache.clear();
   try { return (await call(`${API}?action=list`)).profiles || {}; } catch { return {}; }
 }
 
@@ -20,6 +22,8 @@ export async function getPhoto(id) {
   if (photoCache.has(id)) return photoCache.get(id);
   const p = call(`${API}?action=photo&id=${encodeURIComponent(id)}`).then((d) => d.photo).catch(() => null);
   photoCache.set(id, p);
+  // se la foto non c'è (ancora) non la ricordo: al prossimo controllo la riscarica
+  p.then((ph) => { if (!ph) photoCache.delete(id); });
   return p;
 }
 

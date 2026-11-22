@@ -4,6 +4,7 @@ import { setHeader, loadSeason, state, route } from '../app.js';
 import { seasonData, seasonTotals, per90, playerSeries, METRICS, numberAt, detectTrends } from '../stats.js';
 import { lineChart, pitchHeatmap, mergeHeatmaps } from '../charts.js';
 import { exportPlayerPdf } from '../pdf.js';
+import { listProfiles, getPhoto, privateProfiles, resetPin } from '../profiles.js';
 
 // ---------- Rosa ----------
 
@@ -67,7 +68,7 @@ export async function playerView(root, id) {
   const info = [
     ['Ruolo', p.role], ['Posizione', p.position], ['Piede', p.foot], ['Nato il', p.birthDate ? `${fmtDate(p.birthDate)} (${age(p.birthDate)} anni)` : ''],
     ['Luogo di nascita', p.birthPlace], ['Altezza', p.height ? `${p.height} cm` : ''], ['Peso', p.weight ? `${p.weight} kg` : ''],
-    ['Contatto', p.contact], ['Visita medica', p.medicalExpiry ? `scade il ${fmtDate(p.medicalExpiry)}` : ''],
+    ['Cellulare', p.phone], ['Email', p.email], ['Contatto genitore', p.contact], ['Visita medica', p.medicalExpiry ? `scade il ${fmtDate(p.medicalExpiry)}` : ''],
     ...(team?.customFields || []).map((c) => [c.name, (p.custom || {})[c.id]]),
   ].filter(([, v]) => v != null && v !== '');
 
@@ -127,7 +128,9 @@ export async function playerView(root, id) {
       ${(p.numberHistory || []).length ? `<p class="small muted mt">Numeri precedenti: ${(p.numberHistory || []).map((h) => `#${esc(h.number)}${h.from || h.to ? ` (${h.from ? 'dal ' + shortDate(h.from) : ''}${h.to ? ' al ' + shortDate(h.to) : ''})` : ''}`).join(', ')}</p>` : ''}
       ${p.notes ? `<p class="notes mt">${esc(p.notes)}</p>` : ''}</div>` : ''}
 
+    <div id="remote"></div>
     <button class="btn primary block mt" data-action="pdf">📄 Esporta scheda PDF</button>`;
+  showRemoteProfile(root.querySelector('#remote'), p);
 
   const drawChart = () => {
     const key = $('#metric', root).value;
@@ -205,6 +208,8 @@ export async function playerEditView(root, id) {
         ${field('Data di nascita', 'birthDate', p.birthDate, 'date')}
         ${field('Luogo di nascita', 'birthPlace', p.birthPlace)}
         <div class="row gap">${field('Altezza (cm)', 'height', p.height, 'number', 'inputmode="numeric"')}${field('Peso (kg)', 'weight', p.weight, 'number', 'inputmode="decimal" step="0.1"')}</div>
+        ${field('Cellulare', 'phone', p.phone, 'tel', 'inputmode="tel"')}
+        ${field('Email', 'email', p.email, 'email')}
         ${field('Contatto genitore', 'contact', p.contact, 'text', 'placeholder="Nome e telefono"')}
         ${field('Scadenza visita medica', 'medicalExpiry', p.medicalExpiry, 'date')}
       </div>
@@ -240,7 +245,7 @@ export async function playerEditView(root, id) {
   $('#pf', root).onsubmit = async (e) => {
     e.preventDefault();
     const f = new FormData(e.target);
-    ['firstName', 'lastName', 'role', 'position', 'foot', 'birthDate', 'birthPlace', 'contact', 'medicalExpiry', 'notes'].forEach((k) => (p[k] = (f.get(k) || '').trim()));
+    ['firstName', 'lastName', 'role', 'position', 'foot', 'birthDate', 'birthPlace', 'phone', 'email', 'contact', 'medicalExpiry', 'notes'].forEach((k) => (p[k] = (f.get(k) || '').trim()));
     ['number', 'height', 'weight'].forEach((k) => { const v = f.get(k); p[k] = v === '' || v == null ? '' : Number(v); });
     p.custom = p.custom || {};
     (team?.customFields || []).forEach((c) => { p.custom[c.id] = f.get('cf_' + c.id); });
@@ -275,3 +280,67 @@ export async function playerEditView(root, id) {
 }
 
 export { numberAt };
+
+// ---------- Dati inviati dal giocatore (schede compilate dai ragazzi) ----------
+
+async function showRemoteProfile(el, p) {
+  const pub = (await listProfiles())[p.id];
+  if (!pub || !el.isConnected) return;
+  const code = await db.getMeta('clubCode');
+  let priv = null, privErr = '';
+  if (code) { try { priv = (await privateProfiles(code))[p.id] || null; } catch (e) { privErr = e.message; } }
+  const photo = pub.hasPhoto ? await getPhoto(p.id) : null;
+  const diff = (photo && photo !== p.photo) || (pub.birthDate && pub.birthDate !== p.birthDate)
+    || (priv && ((priv.phone && priv.phone !== p.phone) || (priv.email && priv.email !== p.email)));
+  el.innerHTML = `<h2 class="section">Dati inviati dal giocatore</h2>
+    <div class="card small">
+      <div class="row gap center">${photo ? `<img class="avatar" style="width:54px;height:54px" src="${photo}" alt="">` : ''}
+      <div class="grow">
+        <div>🎂 ${pub.birthDate ? esc(fmtDate(pub.birthDate)) : '–'}</div>
+        ${priv ? `<div>📱 ${esc(priv.phone || '–')}</div><div>✉️ ${esc(priv.email || '–')}</div>` : `<div class="muted">${privErr ? esc(privErr) : 'Cellulare ed email: entra con la password admin per vederli.'}</div>`}
+        <div class="muted">Inviati il ${esc(new Date(pub.updatedAt).toLocaleString('it-IT'))}</div></div></div>
+      <div class="row gap mt">
+        ${diff ? '<button class="btn small primary grow" id="applyRemote">Copia nel profilo</button>' : '<span class="muted grow">Profilo già aggiornato ✅</span>'}
+        ${code ? '<button class="btn small" id="resetPin">Azzera PIN</button>' : ''}
+      </div>
+    </div>`;
+  const ap = el.querySelector('#applyRemote');
+  if (ap) ap.onclick = async () => {
+    if (photo) p.photo = photo;
+    if (pub.birthDate) p.birthDate = pub.birthDate;
+    if (priv?.phone) p.phone = priv.phone;
+    if (priv?.email) p.email = priv.email;
+    await db.put('players', p);
+    toast('Profilo aggiornato con i dati del giocatore');
+    route();
+  };
+  const rp = el.querySelector('#resetPin');
+  if (rp) rp.onclick = async () => {
+    if (!(await confirmDialog(`Azzerare il PIN di ${fullName(p)}? Al prossimo invio potrà sceglierne uno nuovo.`, 'Azzera'))) return;
+    try { await resetPin(code, p.id); toast('PIN azzerato'); } catch (e) { toast(e.message, 4000); }
+  };
+}
+
+/** Copia in un colpo nei profili tutti i dati inviati dai ragazzi. */
+export async function applyAllProfiles() {
+  const pubs = await listProfiles();
+  const ids = Object.keys(pubs);
+  if (!ids.length) { toast('Nessuna scheda compilata dai ragazzi (o servizio non attivo).', 4000); return; }
+  const code = await db.getMeta('clubCode');
+  let priv = {};
+  if (code) { try { priv = await privateProfiles(code); } catch { /* solo dati pubblici */ } }
+  const players = await db.all('players');
+  const changed = [];
+  for (const p of players) {
+    const pub = pubs[p.id];
+    if (!pub) continue;
+    if (pub.hasPhoto) { const ph = await getPhoto(p.id); if (ph) p.photo = ph; }
+    if (pub.birthDate) p.birthDate = pub.birthDate;
+    if (priv[p.id]?.phone) p.phone = priv[p.id].phone;
+    if (priv[p.id]?.email) p.email = priv[p.id].email;
+    changed.push(p);
+  }
+  await db.putMany('players', changed);
+  toast(`Aggiornati ${changed.length} profili con le schede dei ragazzi`, 3500);
+  route();
+}

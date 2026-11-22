@@ -2,6 +2,7 @@ import * as db from '../db.js';
 import { chooseFileAsAdmin } from '../admin.js';
 import { unlockClubData, checkClubUpdate } from '../clubdata.js';
 import { setRole, misterLogin, logout } from '../roles.js';
+import { applyAllProfiles } from './players.js';
 import { esc, on, toast, confirmDialog, pick, shareOrDownload, chooseFile, readText, fullName, sheet, $ } from '../util.js';
 import { setHeader, setCurrent, route, loadSeason, state, byNumber, APP_VERSION, checkForUpdate } from '../app.js';
 import * as sync from '../sync.js';
@@ -124,6 +125,7 @@ export async function moreView(root) {
         <button class="btn primary grow" data-action="export">Esporta backup</button>
         <button class="btn grow" data-action="import">Importa backup</button>
       </div>
+      <button class="btn block mt" data-action="profiles">📝 Importa le schede compilate dai ragazzi</button>
       <button class="btn primary block mt" data-action="clubData">⚽ Carica / aggiorna i dati del Calcio Palazzo</button>
       <button class="btn block mt" data-action="importRose">Importa rose o calendario</button>
       <p class="small muted">"Importa rose o calendario" aggiunge squadre, giocatori o partite da un file preparato (es. elenchi Excel della società, calendari del campionato) senza cancellare i dati presenti.</p>
@@ -171,6 +173,7 @@ export async function moreView(root) {
   on(root, 'import', restoreBackup);
   on(root, 'importRose', importRose);
   on(root, 'clubData', loadClubData);
+  on(root, 'profiles', applyAllProfiles);
   on(root, 'logout', async () => {
     if (!(await confirmDialog('Uscire dall\'accesso mister? I dati restano su questo telefono; per rientrare servirà la password.', 'Esci'))) return;
     logout();

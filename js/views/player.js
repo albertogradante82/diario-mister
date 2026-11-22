@@ -1,5 +1,6 @@
 // Accesso giocatori/genitori: sola lettura, dati pubblici (dati/pubblico.json).
-import { esc, fmtDate, today } from '../util.js';
+import { esc, fmtDate, today, toast, resizeImage, age, $ } from '../util.js';
+import { listProfiles, getPhoto, saveProfile } from '../profiles.js';
 import { setHeader } from '../app.js';
 import { PALETTE } from '../charts.js';
 
@@ -80,6 +81,7 @@ export async function playerCalendarView(root) {
 
 export async function playerRosterView(root) {
   setHeader({ title: 'Squadre' });
+  const profs = await listProfiles();
   await withData(root, (d) => {
     const color = teamColors(d.teams);
     const draw = () => {
@@ -90,9 +92,15 @@ export async function playerRosterView(root) {
       root.innerHTML = `${pick.html}
         ${groups.map(([role, l]) => `<h2 class="section">${esc(role)} <span class="muted">(${l.length})</span></h2>
           <div class="list">${l.sort((a, b) => (Number(a.number) || 99) - (Number(b.number) || 99) || a.name.localeCompare(b.name)).map((p) =>
-            `<div class="item"><span class="num-badge">${esc(p.number === '' ? '–' : p.number)}</span><div class="grow">${esc(p.name)}</div></div>`).join('')}</div>`).join('')
-          || '<div class="empty"><p>Rosa non disponibile.</p></div>'}`;
+            `<a class="item" href="#/g/giocatore/${p.id}"><span class="num-badge" data-ph="${p.id}">${esc(p.number === '' ? '–' : p.number)}</span><div class="grow">${esc(p.name)}${profs[p.id] ? ' <span class="small">✅</span>' : ''}</div><span class="chev">›</span></a>`).join('')}</div>`).join('')
+          || '<div class="empty"><p>Rosa non disponibile.</p></div>'}
+        <p class="small muted mt">Tocca il tuo nome per vedere la tua scheda e completarla (foto, data di nascita, contatti). ✅ = scheda compilata.</p>`;
       bindPicker(root, draw);
+      root.querySelectorAll('[data-ph]').forEach(async (el) => {
+        if (!profs[el.dataset.ph]?.hasPhoto) return;
+        const ph = await getPhoto(el.dataset.ph);
+        if (ph) el.outerHTML = `<img class="avatar" style="width:34px;height:34px" src="${ph}" alt="">`;
+      });
     };
     draw();
   });
@@ -133,5 +141,98 @@ export async function playerScorersView(root) {
       bindPicker(root, draw);
     };
     draw();
+  });
+}
+
+// ---------- Scheda giocatore (pubblica) e compilazione ----------
+
+function findPlayer(d, id) {
+  const p = d.players.find((x) => x.id === id);
+  if (!p) return null;
+  const team = d.teams.find((t) => t.id === p.teamId);
+  const official = d.teams.flatMap((t) => (t.stats?.marcatori || []).filter((m) => m.playerId === id).map((m) => ({ ...m, team: t.name })));
+  return { p, team, official };
+}
+
+export async function playerProfileView(root, id) {
+  setHeader({ title: 'Scheda giocatore', back: '#/g/rose' });
+  const profs = await listProfiles();
+  await withData(root, async (d) => {
+    const f = findPlayer(d, id);
+    if (!f) { root.innerHTML = '<div class="card">Giocatore non trovato.</div>'; return; }
+    const { p, team, official } = f;
+    const pr = profs[id] || {};
+    const photo = pr.hasPhoto ? await getPhoto(id) : null;
+    const gol = official.reduce((a, m) => a + (m.gol || 0), 0), ast = official.reduce((a, m) => a + (m.assist || 0), 0);
+    root.innerHTML = `
+      <div class="card center-col">
+        ${photo ? `<img class="avatar" style="width:110px;height:110px" src="${photo}" alt="">` : `<span class="avatar" style="width:110px;height:110px;font-size:40px">${esc(p.number === '' ? p.name.split(' ').map((w) => w[0]).join('').slice(0, 2) : p.number)}</span>`}
+        <h2 class="mt">${esc(p.name)}</h2>
+        <div class="muted">${esc(team?.name || '')}${p.role ? ' · ' + esc(p.role) : ''}${p.number !== '' ? ' · #' + esc(p.number) : ''}</div>
+        ${pr.birthDate ? `<div class="mt">🎂 ${esc(fmtDate(pr.birthDate, { day: 'numeric', month: 'long', year: 'numeric' }))} (${age(pr.birthDate)} anni)</div>` : ''}
+      </div>
+      <div class="tiles">
+        <div class="tile"><div class="tile-v">${gol}</div><div class="tile-l">Gol</div></div>
+        <div class="tile"><div class="tile-v">${ast}</div><div class="tile-l">Assist</div></div>
+        <div class="tile"><div class="tile-v">${gol + ast}</div><div class="tile-l">Gol + assist</div></div>
+      </div>
+      ${official.length > 1 ? `<div class="card small">${official.map((m) => `<div>${esc(m.team)}: ${m.gol} gol, ${m.assist} assist</div>`).join('')}</div>` : ''}
+      <a class="btn primary block mt" href="#/g/giocatore/${id}/modifica">${pr.updatedAt ? '✏️ Modifica la mia scheda' : '✏️ È la mia scheda: compilala'}</a>
+      <p class="small muted mt">Foto e data di nascita sono visibili a tutti nell'app. Cellulare ed email li vede solo la società.</p>`;
+  });
+}
+
+export async function playerProfileEditView(root, id) {
+  setHeader({ title: 'La mia scheda', back: `#/g/giocatore/${id}` });
+  const profs = await listProfiles();
+  await withData(root, async (d) => {
+    const f = findPlayer(d, id);
+    if (!f) { root.innerHTML = '<div class="card">Giocatore non trovato.</div>'; return; }
+    const { p } = f;
+    const pr = profs[id] || {};
+    let photo;  // undefined = invariata
+    const current = pr.hasPhoto ? await getPhoto(id) : null;
+    root.innerHTML = `
+      <form class="form" id="pf">
+        <div class="card center-col">
+          <div id="ph">${current ? `<img class="avatar" style="width:100px;height:100px" src="${current}" alt="">` : '<span class="avatar" style="width:100px;height:100px;font-size:36px">📷</span>'}</div>
+          <div class="row gap mt"><label class="btn small">Scegli foto<input type="file" accept="image/*" id="photo" hidden></label>
+          ${current ? '<button type="button" class="btn small" id="nophoto">Rimuovi</button>' : ''}</div>
+          <h3 class="mt">${esc(p.name)}</h3>
+        </div>
+        <div class="card">
+          <label>Data di nascita<input type="date" name="birthDate" value="${esc(pr.birthDate || '')}" required></label>
+          <label>Cellulare <span class="muted">(visibile solo alla società)</span><input type="tel" name="phone" inputmode="tel" placeholder="es. 333 1234567" autocomplete="tel"></label>
+          <label>Email <span class="muted">(visibile solo alla società)</span><input type="email" name="email" placeholder="nome@esempio.it" autocomplete="email"></label>
+          ${pr.updatedAt ? '<p class="small muted">Per sicurezza cellulare ed email già inviati non vengono mostrati: lasciali vuoti per cancellarli o riscrivili.</p>' : ''}
+        </div>
+        <div class="card">
+          <label>${pr.updatedAt ? 'Il tuo PIN' : 'Scegli un PIN di 4-6 cifre'} <input type="password" name="pin" inputmode="numeric" pattern="[0-9]{4,6}" maxlength="6" required autocomplete="off"></label>
+          <p class="small muted">${pr.updatedAt ? 'Il PIN che hai scelto la prima volta. Se l\'hai dimenticato chiedi al mister di azzerarlo.' : 'Servirà per modificare la scheda in futuro: così nessun altro può cambiarla. Ricordatelo!'}</p>
+          <label class="switch small mt" style="white-space:normal"><input type="checkbox" name="consent" required> Sono il giocatore, oppure il genitore/tutore se minorenne, e acconsento a condividere questi dati con la società ASD Calcio Palazzo.</label>
+        </div>
+        <button class="btn primary block" id="send">Invia</button>
+      </form>`;
+    $('#photo', root).onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      try { photo = await resizeImage(file, 256); $('#ph', root).innerHTML = `<img class="avatar" style="width:100px;height:100px" src="${photo}" alt="">`; } catch (err) { toast(err.message); }
+    };
+    const np = $('#nophoto', root);
+    if (np) np.onclick = () => { photo = ''; $('#ph', root).innerHTML = '<span class="avatar" style="width:100px;height:100px;font-size:36px">📷</span>'; };
+    $('#pf', root).onsubmit = async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const btn = $('#send', root);
+      btn.disabled = true; btn.textContent = 'Invio…';
+      try {
+        const r = await saveProfile({ id, pin: fd.get('pin'), birthDate: fd.get('birthDate'), phone: fd.get('phone'), email: fd.get('email'), consent: fd.get('consent') === 'on', ...(photo !== undefined ? { photo } : {}) });
+        toast(r.newPin ? 'Scheda inviata! Ricorda il tuo PIN.' : 'Scheda aggiornata!', 3500);
+        location.hash = `#/g/giocatore/${id}`;
+      } catch (err) {
+        toast(err.status === 503 ? 'Servizio non ancora attivo: avvisa il mister.' : err.message, 4500);
+        btn.disabled = false; btn.textContent = 'Invia';
+      }
+    };
   });
 }

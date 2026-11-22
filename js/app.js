@@ -6,7 +6,7 @@ import { rosterView, playerView, playerEditView } from './views/players.js';
 import { analysisView } from './views/analysis.js';
 import { calendarView } from './views/calendar.js';
 import { homeView } from './views/home.js';
-import { playerCalendarView, playerRosterView, playerScorersView } from './views/player.js';
+import { playerCalendarView, playerRosterView, playerScorersView, playerProfileView, playerProfileEditView } from './views/player.js';
 import { roleChoiceView, autoUpdateClubData } from './views/more.js';
 import { getRole, logout } from './roles.js';
 import { confirmDialog } from './util.js';
@@ -119,6 +119,8 @@ const playerRoutes = [
   [/^#\/g\/calendario$/, playerCalendarView, 'g-cal'],
   [/^#\/g\/rose$/, playerRosterView, 'g-rose'],
   [/^#\/g\/marcatori$/, playerScorersView, 'g-marc'],
+  [/^#\/g\/giocatore\/([^/]+)\/modifica$/, playerProfileEditView, 'g-rose'],
+  [/^#\/g\/giocatore\/([^/]+)$/, playerProfileView, 'g-rose'],
 ];
 
 const TABS = {
@@ -185,7 +187,8 @@ export async function route() {
       return;
     }
     for (const [re, fn, tab] of playerRoutes) {
-      if (re.test(hash)) { await run(fn, [], tab); return; }
+      const mm = hash.match(re);
+      if (mm) { await run(fn, mm.slice(1).map(decodeURIComponent), tab); return; }
     }
     location.replace('#/g/calendario');
     return;
@@ -217,7 +220,7 @@ function setTab(tab) {
 
 // ---------- Avvio ----------
 
-export const APP_VERSION = '1.9.1';
+export const APP_VERSION = '1.10.0';
 let swReg = null;
 
 /** Controlla subito se c'è una versione nuova dell'app; restituisce true se è stata trovata. */

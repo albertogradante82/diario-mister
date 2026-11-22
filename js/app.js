@@ -161,6 +161,24 @@ function setTab(tab) {
 
 // ---------- Avvio ----------
 
+export const APP_VERSION = '1.4.2';
+let swReg = null;
+
+/** Controlla subito se c'è una versione nuova dell'app; restituisce true se è stata trovata. */
+export async function checkForUpdate() {
+  if (!swReg) return false;
+  await swReg.update();
+  const nw = swReg.installing || swReg.waiting;
+  if (!nw) return false;
+  await new Promise((res) => {
+    if (nw.state === 'activated') return res();
+    nw.addEventListener('statechange', () => { if (nw.state === 'activated') res(); });
+    setTimeout(res, 8000);
+  });
+  location.reload();
+  return true;
+}
+
 window.addEventListener('hashchange', route);
 function syncIndicator(st) {
   const el = $('#sync-ind');
@@ -191,12 +209,24 @@ window.addEventListener('DOMContentLoaded', async () => {
   db.requestPersistence();
   if ('serviceWorker' in navigator) {
     try {
-      const reg = await navigator.serviceWorker.register('./sw.js');
-      reg.addEventListener('updatefound', () => {
-        const nw = reg.installing;
-        nw && nw.addEventListener('statechange', () => {
-          if (nw.state === 'installed' && navigator.serviceWorker.controller) toast('Nuova versione disponibile: chiudi e riapri l\'app.', 5000);
-        });
+      const hadController = !!navigator.serviceWorker.controller;
+      const reg = await navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' });
+      swReg = reg;
+      // quando una versione nuova prende il controllo, ricarica (ma non durante il live o una modifica)
+      let reloading = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!hadController || reloading) return;
+        if (/\/(live|modifica|nuovo|nuova)$/.test(location.hash)) {
+          toast('Nuova versione pronta: verrà usata alla prossima apertura.', 4000);
+          return;
+        }
+        reloading = true;
+        location.reload();
+      });
+      // controlla gli aggiornamenti all'avvio e ogni volta che l'app torna in primo piano
+      reg.update().catch(() => {});
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') reg.update().catch(() => {});
       });
     } catch (e) { console.warn('Service worker non registrato', e); }
   }

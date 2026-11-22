@@ -1,7 +1,7 @@
 import * as db from '../db.js';
 import { chooseFileAsAdmin } from '../admin.js';
 import { esc, on, toast, confirmDialog, pick, shareOrDownload, chooseFile, readText, fullName, sheet, $ } from '../util.js';
-import { setHeader, setCurrent, route, loadSeason, state, byNumber } from '../app.js';
+import { setHeader, setCurrent, route, loadSeason, state, byNumber, APP_VERSION, checkForUpdate } from '../app.js';
 import * as sync from '../sync.js';
 
 const CATEGORIES = ['Piccoli Amici', 'Primi Calci', 'Pulcini', 'Esordienti', 'Giovanissimi', 'Allievi', 'Juniores', 'Altro'];
@@ -122,12 +122,19 @@ export async function moreView(root) {
     <h2 class="section">Informazioni</h2>
     <div class="card small">
       <p><strong>Installare su iPhone:</strong> apri il link in Safari → tasto Condividi → <em>Aggiungi alla schermata Home</em>. L'app funziona anche senza connessione.</p>
-      <p class="muted">Versione 1.0 · nessun dato inviato a server · rispetta la privacy dei minori: raccogli il consenso dei genitori per foto e dati.</p>
+      <div class="row gap center mb"><span class="grow">Versione <strong>${APP_VERSION}</strong></span><button class="btn small" data-action="update">Controlla aggiornamenti</button></div>
+      <p class="muted">Nessun dato inviato a server senza archivio condiviso · rispetta la privacy dei minori: raccogli il consenso dei genitori per foto e dati.</p>
       <button class="btn danger block mt" data-action="wipe">Cancella tutti i dati</button>
     </div>`;
 
   renderSyncCard($('#syncCard', root), teams.length > 0);
   on(root, 'export', exportBackup);
+  on(root, 'update', async () => {
+    toast('Controllo aggiornamenti…');
+    try {
+      if (!(await checkForUpdate())) toast(`Hai già l'ultima versione (${APP_VERSION})`);
+    } catch { toast('Impossibile controllare: sei offline?'); }
+  });
   on(root, 'import', restoreBackup);
   on(root, 'importRose', importRose);
   on(root, 'merge', () => mergePlayers(players));

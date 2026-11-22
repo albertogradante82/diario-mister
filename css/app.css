@@ -342,3 +342,16 @@ body.onboarding { padding-bottom: var(--safe-b); }
 .choice-icon { font-size: 30px; flex: none; }
 .choice strong { display: block; font-size: 16px; }
 .choice small { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
+
+/* Home */
+.next-match { background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 70%, #000)); color: #fff; }
+.next-match .muted, .next-match .small { color: rgba(255,255,255,.85); }
+.next-match .btn { background: rgba(255,255,255,.2); color: #fff; }
+.next-match .btn.primary { background: #fff; color: var(--accent); }
+.next-match.is-live { background: linear-gradient(135deg, var(--ko), color-mix(in srgb, var(--ko) 70%, #000)); }
+.nm-title { font-size: 24px; font-weight: 800; margin: 4px 0; }
+a.tile { color: var(--text); display: block; }
+.rank { width: 20px; text-align: center; font-weight: 800; color: var(--muted); }
+.quick { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.quick-btn { background: var(--card); border-radius: 14px; padding: 14px 10px; display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--text); font-size: 14px; font-weight: 600; }
+.quick-btn span { font-size: 26px; }

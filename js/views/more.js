@@ -291,7 +291,7 @@ async function mergeRose(json) {
   await write('events', events);
   if (!state.teamId && teams[0]) await setCurrent(teams[0].id, seasons.find((s) => s.teamId === teams[0].id)?.id || null);
   toast(`Importati: ${what}`);
-  location.hash = '#/altro';
+  location.hash = '#/home';
   route();
 }
 

@@ -5,6 +5,7 @@ import { matchesView, matchEditView, matchView, liveView } from './views/matches
 import { rosterView, playerView, playerEditView } from './views/players.js';
 import { analysisView } from './views/analysis.js';
 import { calendarView } from './views/calendar.js';
+import { homeView } from './views/home.js';
 import { moreView, teamEditView, onboardingView } from './views/more.js';
 
 // ---------- Stato globale (squadra e stagione selezionate) ----------
@@ -89,6 +90,7 @@ async function renderContext() {
 // ---------- Router ----------
 
 const routes = [
+  [/^#\/home$/, homeView, 'home'],
   [/^#\/partite$/, matchesView, 'partite'],
   [/^#\/calendario$/, calendarView, 'partite'],
   [/^#\/partita\/nuova$/, (r) => matchEditView(r, null), 'partite'],
@@ -116,7 +118,7 @@ export async function route() {
   const my = ++navToken;
   if (cleanup) { try { cleanup(); } catch { /* */ } cleanup = null; }
   const view = $('#view');
-  const hash = location.hash || '#/partite';
+  const hash = location.hash || '#/home';
   const { team, season } = await loadCurrent();
   if (my !== navToken) return;
   document.body.classList.toggle('live-mode', /\/live$/.test(hash));
@@ -153,7 +155,7 @@ export async function route() {
       return;
     }
   }
-  location.replace('#/partite');
+  location.replace('#/home');
 }
 
 function setTab(tab) {
@@ -162,7 +164,7 @@ function setTab(tab) {
 
 // ---------- Avvio ----------
 
-export const APP_VERSION = '1.4.3';
+export const APP_VERSION = '1.5.0';
 let swReg = null;
 
 /** Controlla subito se c'è una versione nuova dell'app; restituisce true se è stata trovata. */

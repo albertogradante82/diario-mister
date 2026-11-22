@@ -1,4 +1,5 @@
 import * as db from '../db.js';
+import { chooseFileAsAdmin } from '../admin.js';
 import { esc, on, toast, confirmDialog, pick, sheet, fullName, fmtDate, clock, num, pct, today, chooseFile, readText, $, $$ } from '../util.js';
 import { setHeader, loadSeason, state, route, byNumber } from '../app.js';
 import {
@@ -30,7 +31,7 @@ export async function matchesView(root) {
   const ctx = await loadSeason();
   setHeader({ title: 'Partite', actions: `<a class="hdr-btn" href="#/partita/nuova" aria-label="Nuova partita">＋</a>` });
   if (!ctx.matches.length) {
-    root.innerHTML = `<div class="empty"><div class="empty-icon">📅</div><p>Nessuna partita in questa stagione.</p><a class="btn primary" href="#/partita/nuova">Crea la prima partita</a></div>`;
+    root.innerHTML = `<a class="btn block mb" href="#/calendario">📆 Calendario di tutte le squadre</a><div class="empty"><div class="empty-icon">📅</div><p>Nessuna partita in questa stagione.</p><a class="btn primary" href="#/partita/nuova">Crea la prima partita</a></div>`;
     return;
   }
   const res = { v: 0, n: 0, p: 0 };
@@ -43,12 +44,13 @@ export async function matchesView(root) {
     const live = m.status === 'in corso';
     return `<a class="item" href="#/partita/${m.id}">
       <div class="date-box"><b>${esc(fmtDate(m.date, { day: '2-digit' }))}</b><small>${esc(fmtDate(m.date, { month: 'short' }))}</small></div>
-      <div class="grow"><strong>${esc(matchTitle(m, ctx.team))}</strong>
-        <div class="muted small">${esc(m.competition || '')}${(ctx.trackingByMatch[m.id] || []).length ? ' · 📡 tracking' : ''}</div></div>
+      <div class="grow"><strong>${esc(m.opponent)}</strong> <span class="muted small">${m.home === false ? 'trasferta' : 'in casa'}</span>
+        <div class="muted small">${esc(m.competition || '')}${m.round ? ' · ' + esc(m.round) : ''}${m.time ? ' · ' + esc(m.time) : ''}${(ctx.trackingByMatch[m.id] || []).length ? ' · 📡 tracking' : ''}</div></div>
       ${live ? '<span class="badge live">LIVE</span>' : done || ev.length ? `<span class="score ${out}">${scoreLabel(m, s)}</span>` : '<span class="badge">da giocare</span>'}
     </a>`;
   });
   root.innerHTML = `
+    <a class="btn block mb" href="#/calendario">📆 Calendario di tutte le squadre</a>
     <div class="record"><span class="win">${res.v} V</span><span class="draw">${res.n} N</span><span class="loss">${res.p} P</span></div>
     <div class="list">${items.join('')}</div>`;
 }
@@ -64,7 +66,8 @@ export async function matchEditView(root, id) {
   if (!m) { root.innerHTML = '<div class="card">Partita non trovata.</div>'; return; }
   setHeader({ title: id ? 'Modifica partita' : 'Nuova partita', back: id ? `#/partita/${id}` : '#/partite' });
   const starters = new Set((m.periods?.[0]?.onFieldStart) || []);
-  const squad = new Set(m.squad || []);
+  // partite importate dal calendario: convocati di default tutta la rosa
+  const squad = new Set(m.squad && m.squad.length ? m.squad : ctx.players.map((p) => p.id));
 
   root.innerHTML = `
     <form class="form" id="mf">
@@ -184,7 +187,7 @@ export async function matchView(root, id) {
 
   root.innerHTML = `
     <div class="match-head card">
-      <div class="muted small">${esc(fmtDate(m.date, { weekday: 'long', day: 'numeric', month: 'long' }))}${m.time ? ' · ' + esc(m.time) : ''} · ${esc(m.competition || '')}</div>
+      <div class="muted small">${esc(fmtDate(m.date, { weekday: 'long', day: 'numeric', month: 'long' }))}${m.time ? ' · ' + esc(m.time) : ''} · ${esc(m.competition || '')}${m.round ? ' · ' + esc(m.round) : ''}</div>
       <div class="mh-title">${esc(matchTitle(m, ctx.team))}</div>
       <div class="mh-score">${scoreLabel(m, s)}</div>
       <div class="muted small">${esc(m.status)} · ${n} ${n === 1 ? 'tempo' : 'tempi'} da ${m.periodMinutes}′</div>
@@ -406,7 +409,7 @@ function chooseOnField(m, players, current, title) {
 // ---------- Import tracking ----------
 
 async function importTrackingFlow(m, ctx, existing) {
-  const file = await chooseFile('application/json,.json');
+  const file = await chooseFileAsAdmin('application/json,.json', 'Le importazioni sono riservate all\'amministratore.');
   if (!file) return;
   let parsed;
   try {

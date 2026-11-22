@@ -4,6 +4,7 @@ import { esc, $, toast, pick } from './util.js';
 import { matchesView, matchEditView, matchView, liveView } from './views/matches.js';
 import { rosterView, playerView, playerEditView } from './views/players.js';
 import { analysisView } from './views/analysis.js';
+import { calendarView } from './views/calendar.js';
 import { moreView, teamEditView, onboardingView } from './views/more.js';
 
 // ---------- Stato globale (squadra e stagione selezionate) ----------
@@ -89,6 +90,7 @@ async function renderContext() {
 
 const routes = [
   [/^#\/partite$/, matchesView, 'partite'],
+  [/^#\/calendario$/, calendarView, 'partite'],
   [/^#\/partita\/nuova$/, (r) => matchEditView(r, null), 'partite'],
   [/^#\/partita\/([^/]+)\/modifica$/, (r, id) => matchEditView(r, id), 'partite'],
   [/^#\/partita\/([^/]+)\/live$/, liveView, 'partite'],

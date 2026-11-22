@@ -324,3 +324,7 @@ html, body { overflow-x: hidden; }
 .status-line { display: flex; align-items: center; gap: 8px; }
 .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; background: var(--muted); }
 .dot.ok { background: var(--ok); } .dot.err { background: var(--ko); } .dot.syncing { background: var(--accent); }
+
+/* Calendario società */
+.team-bar { width: 4px; align-self: stretch; border-radius: 4px; flex: none; }
+.cal-time { width: 44px; font-variant-numeric: tabular-nums; font-weight: 700; font-size: 14px; }

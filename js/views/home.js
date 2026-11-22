@@ -2,6 +2,7 @@ import * as db from '../db.js';
 import { esc, fmtDate, today, fullName, avatar } from '../util.js';
 import { setHeader, loadSeason, setCurrent } from '../app.js';
 import { loadClubData } from './more.js';
+import { listNotices } from './board.js';
 import { seasonData, seasonTotals, detectTrends } from '../stats.js';
 
 /** Home: riepilogo della squadra selezionata e della società. */
@@ -45,6 +46,8 @@ export async function homeView(root) {
     return n === 0 ? 'oggi' : n === 1 ? 'domani' : `tra ${n} giorni`;
   };
 
+  let notices = [];
+  try { notices = (await listNotices()).slice(0, 2); } catch { /* bacheca non attiva */ }
   const updBanner = sessionStorage.getItem('clubUpdate') ? `<button class="choice choice-main" id="clubupd"><span class="choice-icon">🔄</span><span><strong>Nuovi risultati e classifiche disponibili</strong><small>Tocca per aggiornare i dati del Calcio Palazzo.</small></span></button>` : '';
   root.innerHTML = `${updBanner}
     ${next ? `
@@ -101,6 +104,11 @@ export async function homeView(root) {
       <div class="date-box"><b>${esc(fmtDate(m.date, { day: '2-digit' }))}</b><small>${esc(fmtDate(m.date, { month: 'short' }))}</small></div>
       <div class="grow"><div class="small accent">${esc(teamName[m.teamId] || '')}</div><strong>${vsLabel(m)}</strong><div class="muted small">${m.time ? 'ore ' + esc(m.time) : ''}</div></div></button>`).join('')}
       <a class="item accent small" href="#/calendario">Calendario completo ›</a></div>` : ''}
+
+    <h2 class="section">Bacheca</h2>
+    <div class="list">${notices.map((n) => `<a class="item" href="#/bacheca"><span style="font-size:22px">${{ comunicazione: '📢', allenamento: '🏃', evento: '🎉', partita: '⚽' }[n.kind] || '📢'}</span>
+      <div class="grow"><strong>${esc(n.title)}</strong><div class="muted small">${n.date ? esc(fmtDate(n.date)) + (n.time ? ' · ' + esc(n.time) : '') : esc(new Date(n.createdAt).toLocaleDateString('it-IT'))}</div></div><span class="chev">›</span></a>`).join('')}
+      <a class="item accent small" href="#/bacheca">${notices.length ? 'Tutti gli avvisi e chi li ha visti ›' : '📣 Pubblica il primo avviso ›'}</a></div>
 
     <h2 class="section">Azioni rapide</h2>
     <div class="quick">

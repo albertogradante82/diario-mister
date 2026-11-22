@@ -25,9 +25,9 @@ export async function roleChoiceView(root) {
       <p class="muted">Diario del Mister · stagione ${esc(defaultSeasonName())}</p>
     </div>
     <p class="small muted center-text mb">Chi sei?</p>
-    <button class="choice choice-main" id="asPlayer"><span class="choice-icon">🏃</span><span><strong>Giocatore o genitore</strong><small>Calendario, risultati, rose e marcatori di tutte le squadre.</small></span></button>
+    <button class="choice choice-main" id="asPlayer"><span class="choice-icon">🏃</span><span><strong>Giocatore o genitore</strong><small>Avvisi della società, calendario, risultati, rose e classifiche.</small></span></button>
     <button class="choice" id="asMister"><span class="choice-icon">📋</span><span><strong>Mister / dirigente</strong><small>Gestione completa: partite live, statistiche, giocatori. Serve la password.</small></span></button>`;
-  $('#asPlayer', root).onclick = () => { setRole('giocatore'); location.hash = '#/g/calendario'; route(); };
+  $('#asPlayer', root).onclick = () => { setRole('giocatore'); location.hash = '#/g/bacheca'; route(); };
   $('#asMister', root).onclick = async () => {
     const data = await misterLogin();
     if (data === false) return;

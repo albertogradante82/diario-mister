@@ -7,6 +7,7 @@ import { rosterView, playerView, playerEditView } from './views/players.js';
 import { analysisView } from './views/analysis.js';
 import { calendarView } from './views/calendar.js';
 import { homeView } from './views/home.js';
+import { playerBoardView, misterBoardView, updateBadge } from './views/board.js';
 import { playerCalendarView, playerRosterView, playerScorersView, playerProfileView, playerProfileEditView } from './views/player.js';
 import { roleChoiceView, autoUpdateClubData } from './views/more.js';
 import { getRole, logout } from './roles.js';
@@ -98,6 +99,7 @@ const routes = [
   [/^#\/home$/, homeView, 'home'],
   [/^#\/partite$/, matchesView, 'partite'],
   [/^#\/calendario$/, calendarView, 'partite'],
+  [/^#\/bacheca$/, misterBoardView, 'home'],
   [/^#\/partita\/nuova$/, (r) => matchEditView(r, null), 'partite'],
   [/^#\/partita\/([^/]+)\/modifica$/, (r, id) => matchEditView(r, id), 'partite'],
   [/^#\/partita\/([^/]+)\/live$/, liveView, 'partite'],
@@ -117,6 +119,7 @@ function getRoleSync() {
 }
 
 const playerRoutes = [
+  [/^#\/g\/bacheca$/, playerBoardView, 'g-bacheca'],
   [/^#\/g\/calendario$/, playerCalendarView, 'g-cal'],
   [/^#\/g\/rose$/, playerRosterView, 'g-rose'],
   [/^#\/g\/marcatori$/, playerScorersView, 'g-marc'],
@@ -126,7 +129,7 @@ const playerRoutes = [
 
 const TABS = {
   mister: [['#/home', 'home', '🏠', 'Home'], ['#/partite', 'partite', '📅', 'Partite'], ['#/rosa', 'rosa', '👥', 'Rosa'], ['#/analisi', 'analisi', '📊', 'Analisi'], ['#/altro', 'altro', '⚙️', 'Altro']],
-  giocatore: [['#/g/calendario', 'g-cal', '📅', 'Calendario'], ['#/g/rose', 'g-rose', '👥', 'Squadre'], ['#/g/marcatori', 'g-marc', '🏆', 'Classifica'], ['#/g/esci', 'g-esci', '🚪', 'Esci']],
+  giocatore: [['#/g/bacheca', 'g-bacheca', '📣', 'Bacheca'], ['#/g/calendario', 'g-cal', '📅', 'Calendario'], ['#/g/rose', 'g-rose', '👥', 'Squadre'], ['#/g/marcatori', 'g-marc', '🏆', 'Classifica'], ['#/g/esci', 'g-esci', '🚪', 'Esci']],
 };
 let tabsFor = null;
 function renderTabbar(role) {
@@ -184,15 +187,15 @@ export async function route() {
     $('#ctx').innerHTML = '';
     if (hash === '#/g/esci') {
       if (await confirmDialog('Uscire dall\'area giocatori?', 'Esci')) logout();
-      location.replace(role && getRoleSync() === 'giocatore' ? '#/g/calendario' : '#/home');
+      location.replace(role && getRoleSync() === 'giocatore' ? '#/g/bacheca' : '#/home');
       route();
       return;
     }
     for (const [re, fn, tab] of playerRoutes) {
       const mm = hash.match(re);
-      if (mm) { await run(fn, mm.slice(1).map(decodeURIComponent), tab); return; }
+      if (mm) { await run(fn, mm.slice(1).map(decodeURIComponent), tab); updateBadge(); return; }
     }
-    location.replace('#/g/calendario');
+    location.replace('#/g/bacheca');
     return;
   }
 
@@ -222,7 +225,7 @@ function setTab(tab) {
 
 // ---------- Avvio ----------
 
-export const APP_VERSION = '1.12.0';
+export const APP_VERSION = '1.13.0';
 let swReg = null;
 
 /** Controlla subito se c'è una versione nuova dell'app; restituisce true se è stata trovata. */

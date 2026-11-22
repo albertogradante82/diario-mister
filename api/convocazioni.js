@@ -77,6 +77,26 @@ module.exports = async function handler(req, res) {
       return send(res, 200, { item });
     }
 
+    if (req.method === 'POST' && action === 'savemany') {
+      // creazione in blocco (es. allenamenti di tutta la stagione)
+      const b = await readBody(req);
+      const list = Array.isArray(b.items) ? b.items.slice(0, 300) : [];
+      const cmds = [];
+      for (const x of list) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(String(x.date || ''))) continue;
+        const players = Array.isArray(x.players) ? [...new Set(x.players.filter((p) => PID.test(p)))].slice(0, 60) : [];
+        if (!players.length) continue;
+        const id = CID.test(String(x.id)) ? x.id : 'c-' + crypto.randomBytes(8).toString('hex');
+        cmds.push(['HSET', 'conv:list', id, JSON.stringify({
+          id, kind: x.kind === 'allenamento' ? 'allenamento' : 'partita', teamId: PID.test(String(x.teamId)) ? x.teamId : '', matchId: str(x.matchId, 60),
+          title: str(x.title, 120) || 'Allenamento', date: x.date, time: /^\d{2}:\d{2}$/.test(String(x.time || '')) ? x.time : '',
+          meetTime: '', place: str(x.place, 120), note: str(x.note, 600), players, closed: false, createdAt: Date.now(), updatedAt: Date.now(),
+        })]);
+      }
+      if (cmds.length) await pipeline(cfg, cmds);
+      return send(res, 200, { created: cmds.length });
+    }
+
     if (req.method === 'POST' && action === 'delete') {
       const { id } = await readBody(req);
       if (!CID.test(String(id))) return send(res, 400, { error: 'Id non valido.' });

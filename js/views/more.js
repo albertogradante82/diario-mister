@@ -17,7 +17,7 @@ export function defaultSeasonName() {
 export async function onboardingView(root) {
   root.innerHTML = `
     <div class="hero">
-      <div class="hero-icon">⚽</div>
+      <img class="hero-logo" src="icons/logo-palazzo.png" alt="Calcio Palazzo">
       <h1>Diario del Mister</h1>
       <p class="muted">Rosa, partite, eventi live e statistiche per il calcio giovanile.</p>
     </div>

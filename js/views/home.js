@@ -107,6 +107,7 @@ export async function homeView(root) {
       <a class="quick-btn" href="#/partita/nuova"><span>➕</span>Nuova partita</a>
       <a class="quick-btn" href="#/giocatore/nuovo"><span>👤</span>Nuovo giocatore</a>
       <a class="quick-btn" href="#/calendario"><span>📆</span>Calendario</a>
+      <a class="quick-btn" href="#/analisi" onclick="sessionStorage.setItem('anTab','giovanili')"><span>🏆</span>Classifica giovanili</a>
       <a class="quick-btn" href="#/altro"><span>📂</span>Importa / backup</a>
     </div>`;
 

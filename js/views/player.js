@@ -3,6 +3,7 @@ import { esc, fmtDate, today, toast, resizeImage, age, $ } from '../util.js';
 import { listProfiles, getPhoto, saveProfile, myPrivate, fillPhotos } from '../profiles.js';
 import { sheet } from '../util.js';
 import { exportPublicPlayerPdf } from '../pdf.js';
+import { buildLeaderboard, renderLeaderboard } from './leaderboard.js';
 import { setHeader } from '../app.js';
 import { PALETTE } from '../charts.js';
 
@@ -23,7 +24,8 @@ function teamColors(teams) {
 
 /** Chips per scegliere la squadra (ricordata tra le schermate). */
 function teamPicker(teams, color, { all = false } = {}) {
-  const sel = sessionStorage.getItem('pTeam') || (all ? 'tutte' : teams[0]?.id);
+  let sel = sessionStorage.getItem('pTeam') || (all ? 'tutte' : teams[0]?.id);
+  if (sel === 'giovanili') sel = all ? 'tutte' : teams[0]?.id;
   return {
     sel,
     html: `<div class="chips mb">${all ? `<button class="chip-btn ${sel === 'tutte' ? 'on' : ''}" data-pt="tutte">Tutte</button>` : ''}${teams.map((t) =>
@@ -117,6 +119,14 @@ export async function playerScorersView(root) {
   await withData(root, (d) => {
     const color = teamColors(d.teams);
     const draw = () => {
+      if (sessionStorage.getItem('pTeam') === 'giovanili') {
+        const pick = teamPicker(d.teams, color);
+        root.innerHTML = `<div class="chips mb"><button class="chip-btn on lb-chip" data-pt="giovanili">🏆 Tutte le giovanili</button>${pick.html.replace('<div class="chips mb">', '').replace(/<\/div>$/, '').replace(/chip-btn on/g, 'chip-btn').replace(/ style="[^"]*"/g, '')}</div><div id="lb"></div>`;
+        bindPicker(root, draw);
+        const upd = d.teams.map((t) => t.stats?.aggiornato).filter(Boolean).sort().pop();
+        renderLeaderboard(root.querySelector('#lb'), buildLeaderboard(d.teams), { link: (id) => `#/g/giocatore/${id}`, updated: upd ? fmtDate(upd) : '' });
+        return;
+      }
       let pick = teamPicker(d.teams, color);
       if (!d.teams.some((t) => t.id === pick.sel)) { sessionStorage.setItem('pTeam', d.teams[0]?.id); pick = teamPicker(d.teams, color); }
       const team = d.teams.find((t) => t.id === pick.sel);
@@ -130,7 +140,7 @@ export async function playerScorersView(root) {
       }
       scorers.sort((a, b) => b.gol - a.gol || a.name.localeCompare(b.name));
       const assists = (st?.marcatori || []).filter((m) => m.assist > 0).sort((a, b) => b.assist - a.assist);
-      root.innerHTML = `${pick.html}
+      root.innerHTML = `${pick.html.replace('<div class="chips mb">', '<div class="chips mb"><button class="chip-btn lb-chip" data-pt="giovanili">🏆 Tutte le giovanili</button>')}
         ${st?.classifica?.length ? `<h2 class="section">Classifica</h2>
           <div class="table-wrap"><table class="table standings">
             <thead><tr><th>#</th><th>Squadra</th><th>PT</th><th>G</th><th>V</th><th>N</th><th>P</th><th>DR</th></tr></thead>

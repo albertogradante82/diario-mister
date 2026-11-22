@@ -4,6 +4,9 @@ import { seasonData, seasonTotals, per90, playerSeries, METRICS, detectTrends, d
 import { lineChart, barChart, hBars, PALETTE } from '../charts.js';
 import { standingsCard } from './home.js';
 import { fillPhotos } from '../profiles.js';
+import { buildLeaderboard, renderLeaderboard } from './leaderboard.js';
+import * as db from '../db.js';
+import { fmtDate } from '../util.js';
 
 const TABS = [['andamento', 'Andamento'], ['ruoli', 'Ruoli'], ['per90', 'Per 90′'], ['tempi', 'Tempi'], ['tendenze', 'Tendenze']];
 const PERIOD_NAMES = ['1° tempo', '2° tempo', '3° tempo'];
@@ -16,11 +19,13 @@ export async function analysisView(root) {
   const totals = Object.fromEntries(players.map((p) => [p.id, seasonTotals(rows, p.id)]));
   const hasTracking = rows.some((r) => r.tracking.length);
   const tc = ctx.team?.tcStats || null;
-  const tabs = tc ? [['campionato', 'Campionato'], ...TABS] : TABS;
+  const allTeams = await db.all('teams');
+  const hasClub = allTeams.some((t) => t.tcStats?.marcatori?.length);
+  const tabs = [...(tc ? [['campionato', 'Campionato']] : []), ...(hasClub ? [['giovanili', '🏆 Giovanili']] : []), ...TABS];
   let tab = sessionStorage.getItem('anTab') || (tc ? 'campionato' : 'andamento');
   if (!tabs.some(([k]) => k === tab)) tab = tabs[0][0];
 
-  if (!rows.length && !tc) {
+  if (!rows.length && !tc && !hasClub) {
     root.innerHTML = `<div class="empty"><div class="empty-icon">📊</div><p>Le analisi compariranno dopo aver registrato almeno una partita.</p></div>`;
     return;
   }
@@ -39,9 +44,15 @@ export async function analysisView(root) {
   const active = players.filter((p) => totals[p.id].minuti > 0);
 
   function draw() {
-    if (tab !== 'campionato' && !rows.length) { pane.innerHTML = '<div class="empty"><p>Nessuna partita registrata per questa analisi.</p></div>'; return; }
-    ({ campionato, andamento, ruoli, per90: per90Tab, tempi, tendenze })[tab]();
+    if (!['campionato', 'giovanili'].includes(tab) && !rows.length) { pane.innerHTML = '<div class="empty"><p>Nessuna partita registrata per questa analisi.</p></div>'; return; }
+    ({ campionato, giovanili, andamento, ruoli, per90: per90Tab, tempi, tendenze })[tab]();
     fillPhotos(pane);
+  }
+
+  // ---- Classifica di tutte le giovanili ----
+  function giovanili() {
+    const upd = allTeams.map((t) => t.tcStats?.aggiornato).filter(Boolean).sort().pop();
+    renderLeaderboard(pane, buildLeaderboard(allTeams), { link: (id) => `#/giocatore/${id}`, updated: upd ? fmtDate(upd) : '' });
   }
 
   // ---- Campionato (dati ufficiali Tuttocampo) ----

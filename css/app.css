@@ -357,3 +357,6 @@ a.tile { color: var(--text); display: block; }
 .quick-btn span { font-size: 26px; }
 
 .hero-logo { width: 120px; height: auto; display: block; margin: 0 auto 6px; filter: drop-shadow(0 4px 10px rgba(0,0,0,.18)); }
+
+.choice-main { border: 2px solid var(--accent); }
+.choice-logo { width: 40px; height: auto; flex: none; }

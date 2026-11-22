@@ -1,5 +1,6 @@
 import * as db from '../db.js';
 import { chooseFileAsAdmin } from '../admin.js';
+import { unlockClubData } from '../clubdata.js';
 import { esc, on, toast, confirmDialog, pick, shareOrDownload, chooseFile, readText, fullName, sheet, $ } from '../util.js';
 import { setHeader, setCurrent, route, loadSeason, state, byNumber, APP_VERSION, checkForUpdate } from '../app.js';
 import * as sync from '../sync.js';
@@ -23,8 +24,9 @@ export async function onboardingView(root, _team, tab = 'home') {
       <h1>Diario del Mister</h1>
       <p class="muted">Rosa, partite, eventi live e statistiche per il calcio giovanile.</p>
     </div>
-    <p class="small muted center-text mb">Per iniziare scegli una di queste tre strade:</p>
-    <button class="choice" id="restore"><span class="choice-icon">📂</span><span><strong>Importa le squadre della società</strong><small>Hai il file delle rose (es. rose-2026-27.json) o un backup. Serve il codice amministratore.</small></span></button>
+    <p class="small muted center-text mb">Per iniziare:</p>
+    <button class="choice choice-main" id="clubdata"><img class="choice-logo" src="icons/logo-palazzo.png" alt=""><span><strong>Carica i dati del Calcio Palazzo</strong><small>Tutte le squadre, i giocatori e i calendari, con un tocco. Serve il codice amministratore.</small></span></button>
+    <button class="choice" id="restore"><span class="choice-icon">📂</span><span><strong>Importa da file</strong><small>Un backup o un file di rose/calendario.</small></span></button>
     <button class="choice" data-open="joinbox"><span class="choice-icon">🔑</span><span><strong>Ho un codice di accesso</strong><small>Entra nell'archivio condiviso della società.</small></span></button>
     <div class="card" id="joinbox" hidden>
       <div class="row gap"><input id="joincode" class="grow code-input" placeholder="Codice di accesso" autocomplete="off" autocapitalize="off"><button class="btn primary" id="join">Entra</button></div>
@@ -36,6 +38,7 @@ export async function onboardingView(root, _team, tab = 'home') {
       <label>Stagione<input name="season" required value="${defaultSeasonName()}"></label>
       <button class="btn primary block">Crea squadra</button>
     </form>`;
+  $('#clubdata', root).onclick = loadClubData;
   root.querySelectorAll('[data-open]').forEach((b) => (b.onclick = () => {
     const box = root.querySelector('#' + b.dataset.open);
     box.hidden = !box.hidden;
@@ -99,6 +102,7 @@ export async function moreView(root) {
         <button class="btn primary grow" data-action="export">Esporta backup</button>
         <button class="btn grow" data-action="import">Importa backup</button>
       </div>
+      <button class="btn primary block mt" data-action="clubData">⚽ Carica / aggiorna i dati del Calcio Palazzo</button>
       <button class="btn block mt" data-action="importRose">Importa rose o calendario</button>
       <p class="small muted">"Importa rose o calendario" aggiunge squadre, giocatori o partite da un file preparato (es. elenchi Excel della società, calendari del campionato) senza cancellare i dati presenti.</p>
     </div>
@@ -143,6 +147,7 @@ export async function moreView(root) {
   });
   on(root, 'import', restoreBackup);
   on(root, 'importRose', importRose);
+  on(root, 'clubData', loadClubData);
   on(root, 'merge', () => mergePlayers(players));
   on(root, 'fields', () => editCustomFields(team));
   on(root, 'wipe', async () => {
@@ -235,6 +240,13 @@ async function restoreBackup() {
   }
 }
 
+// ---------- Dati della società (pacchetto cifrato pubblicato con l'app) ----------
+
+export async function loadClubData() {
+  const data = await unlockClubData();
+  if (data) await mergeRose(data);
+}
+
 // ---------- Importazione rose (unione, non sostituzione) ----------
 
 async function importRose() {
@@ -291,7 +303,9 @@ async function mergeRose(json) {
   await write('players', players);
   await write('matches', matches);
   await write('events', events);
-  if (!state.teamId && teams[0]) await setCurrent(teams[0].id, seasons.find((s) => s.teamId === teams[0].id)?.id || null);
+  // squadra iniziale: preferibilmente una con il calendario già caricato
+  const first = teams.find((t) => matches.some((m) => m.teamId === t.id)) || teams[0];
+  if (!state.teamId && first) await setCurrent(first.id, seasons.find((s) => s.teamId === first.id)?.id || null);
   toast(`Importati: ${what}`);
   location.hash = '#/home';
   route();

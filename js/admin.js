@@ -14,6 +14,11 @@ async function hash(code) {
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
+/** Sblocca la modalità admin (es. dopo aver decifrato i dati della società con lo stesso codice). */
+export function markUnlocked() {
+  unlockedUntil = Date.now() + UNLOCK_MINUTES * 60000;
+}
+
 export function isUnlocked() {
   return Date.now() < unlockedUntil;
 }

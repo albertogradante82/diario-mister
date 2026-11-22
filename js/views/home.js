@@ -75,6 +75,11 @@ export async function homeView(root) {
       ${backupOld ? `<div${medical.length ? ' class="mt"' : ''}>💾 ${lastBackup ? 'Ultimo backup più di 2 settimane fa.' : 'Non hai ancora fatto un backup.'} <a href="#/altro">Fallo ora</a></div>` : ''}
     </div>` : ''}
 
+    <h2 class="section">Bacheca</h2>
+    <div class="list">${notices.map((n) => `<a class="item" href="#/bacheca"><span style="font-size:22px">${{ comunicazione: '📢', allenamento: '🏃', evento: '🎉', partita: '⚽' }[n.kind] || '📢'}</span>
+      <div class="grow"><strong>${esc(n.title)}</strong><div class="muted small">${n.date ? esc(fmtDate(n.date)) + (n.time ? ' · ' + esc(n.time) : '') : esc(new Date(n.createdAt).toLocaleDateString('it-IT'))}</div></div><span class="chev">›</span></a>`).join('')}
+      <a class="item accent small" href="#/bacheca">${notices.length ? 'Tutti gli avvisi e chi li ha visti ›' : '📣 Pubblica il primo avviso ›'}</a></div>
+
     ${last.length ? `<h2 class="section">Ultimi risultati</h2>
     <div class="list">${last.map((r) => {
       const s = r.score, m = r.match;
@@ -105,11 +110,6 @@ export async function homeView(root) {
       <div class="date-box"><b>${esc(fmtDate(m.date, { day: '2-digit' }))}</b><small>${esc(fmtDate(m.date, { month: 'short' }))}</small></div>
       <div class="grow"><div class="small accent">${esc(teamName[m.teamId] || '')}</div><strong>${vsLabel(m)}</strong><div class="muted small">${m.time ? 'ore ' + esc(m.time) : ''}</div></div></button>`).join('')}
       <a class="item accent small" href="#/calendario">Calendario completo ›</a></div>` : ''}
-
-    <h2 class="section">Bacheca</h2>
-    <div class="list">${notices.map((n) => `<a class="item" href="#/bacheca"><span style="font-size:22px">${{ comunicazione: '📢', allenamento: '🏃', evento: '🎉', partita: '⚽' }[n.kind] || '📢'}</span>
-      <div class="grow"><strong>${esc(n.title)}</strong><div class="muted small">${n.date ? esc(fmtDate(n.date)) + (n.time ? ' · ' + esc(n.time) : '') : esc(new Date(n.createdAt).toLocaleDateString('it-IT'))}</div></div><span class="chev">›</span></a>`).join('')}
-      <a class="item accent small" href="#/bacheca">${notices.length ? 'Tutti gli avvisi e chi li ha visti ›' : '📣 Pubblica il primo avviso ›'}</a></div>
 
     <h2 class="section">Azioni rapide</h2>
     <div class="quick">

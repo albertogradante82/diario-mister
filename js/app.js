@@ -120,6 +120,7 @@ export async function route() {
   const { team, season } = await loadCurrent();
   if (my !== navToken) return;
   document.body.classList.toggle('live-mode', /\/live$/.test(hash));
+  document.body.classList.toggle('onboarding', (!team || !season) && !/^#\/squadra\//.test(hash));
 
   const run = async (fn, args, tab) => {
     const box = document.createElement('div');
@@ -161,7 +162,7 @@ function setTab(tab) {
 
 // ---------- Avvio ----------
 
-export const APP_VERSION = '1.4.2';
+export const APP_VERSION = '1.4.3';
 let swReg = null;
 
 /** Controlla subito se c'è una versione nuova dell'app; restituisce true se è stata trovata. */

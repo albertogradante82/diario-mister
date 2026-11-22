@@ -19,22 +19,26 @@ export async function onboardingView(root) {
     <div class="hero">
       <div class="hero-icon">⚽</div>
       <h1>Diario del Mister</h1>
-      <p class="muted">Rosa, partite, eventi live e statistiche per il calcio giovanile. I dati restano solo su questo dispositivo.</p>
+      <p class="muted">Rosa, partite, eventi live e statistiche per il calcio giovanile.</p>
     </div>
-    <form class="card form" id="f">
+    <p class="small muted center-text mb">Per iniziare scegli una di queste tre strade:</p>
+    <button class="choice" id="restore"><span class="choice-icon">📂</span><span><strong>Importa le squadre della società</strong><small>Hai il file delle rose (es. rose-2026-27.json) o un backup. Serve il codice amministratore.</small></span></button>
+    <button class="choice" data-open="joinbox"><span class="choice-icon">🔑</span><span><strong>Ho un codice di accesso</strong><small>Entra nell'archivio condiviso della società.</small></span></button>
+    <div class="card" id="joinbox" hidden>
+      <div class="row gap"><input id="joincode" class="grow code-input" placeholder="Codice di accesso" autocomplete="off" autocapitalize="off"><button class="btn primary" id="join">Entra</button></div>
+    </div>
+    <button class="choice" data-open="f"><span class="choice-icon">➕</span><span><strong>Crea una squadra a mano</strong><small>Parti da zero e inserisci tu i giocatori.</small></span></button>
+    <form class="card form" id="f" hidden>
       <label>Nome squadra<input name="name" required placeholder="es. Esordienti 2014"></label>
       <label>Categoria<select name="category">${CATEGORIES.map((c) => `<option>${c}</option>`).join('')}</select></label>
       <label>Stagione<input name="season" required value="${defaultSeasonName()}"></label>
-      <button class="btn primary block">Inizia</button>
-    </form>
-    <div class="card">
-      <p class="small"><strong>Ti hanno dato un codice?</strong> Entra nell'archivio condiviso e trovi già squadre, giocatori e partite.</p>
-      <div class="row gap"><input id="joincode" class="grow code-input" placeholder="Codice di accesso" autocomplete="off" autocapitalize="off"><button class="btn primary" id="join">Entra</button></div>
-    </div>
-    <div class="card">
-      <p class="muted small">Hai un file di backup o un file rose (squadre e giocatori)?</p>
-      <button class="btn block" id="restore">Apri file</button>
-    </div>`;
+      <button class="btn primary block">Crea squadra</button>
+    </form>`;
+  root.querySelectorAll('[data-open]').forEach((b) => (b.onclick = () => {
+    const box = root.querySelector('#' + b.dataset.open);
+    box.hidden = !box.hidden;
+    if (!box.hidden) box.querySelector('input')?.focus();
+  }));
   $('#join', root).onclick = async () => {
     const code = $('#joincode', root).value;
     if (!code.trim()) { toast('Inserisci il codice'); return; }

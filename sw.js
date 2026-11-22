@@ -1,6 +1,6 @@
 // Service worker: rende l'app utilizzabile offline.
 // Ad ogni rilascio aumenta VERSION per far scaricare i file aggiornati.
-const VERSION = 'mister-v1.4.2';
+const VERSION = 'mister-v1.4.3';
 const ASSETS = [
   './',
   './index.html',

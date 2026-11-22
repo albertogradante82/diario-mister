@@ -328,3 +328,17 @@ html, body { overflow-x: hidden; }
 /* Calendario società */
 .team-bar { width: 4px; align-self: stretch; border-radius: 4px; flex: none; }
 .cal-time { width: 44px; font-variant-numeric: tabular-nums; font-weight: 700; font-size: 14px; }
+
+/* Primo avvio */
+body.onboarding .tabbar { display: none; }
+body.onboarding { padding-bottom: var(--safe-b); }
+.center-text { text-align: center; }
+.choice {
+  display: flex; align-items: center; gap: 14px; width: 100%; text-align: left; font: inherit; color: var(--text);
+  background: var(--card); border: 0; border-radius: var(--radius); padding: 16px; margin-bottom: 10px; cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0,0,0,.05);
+}
+.choice:active { background: var(--accent-soft); }
+.choice-icon { font-size: 30px; flex: none; }
+.choice strong { display: block; font-size: 16px; }
+.choice small { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }

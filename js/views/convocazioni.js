@@ -24,13 +24,16 @@ const post = (action, body, admin) => call(`${API}?action=${action}`, {
 });
 export const listConvocations = async () => (await call(`${API}?action=list`)).items || [];
 const upcoming = (c) => c.date >= today();
-const whenTxt = (c) => `${esc(fmtDate(c.date, { weekday: 'long', day: 'numeric', month: 'long' }))}${c.time ? ' · ore ' + esc(c.time) : ''}`;
+// finestra visibile: prossimi 14 giorni (il resto con "mostra tutti")
+const SOON = () => { const d = new Date(); d.setDate(d.getDate() + 14); return d.toISOString().slice(0, 10); };
+const soon = (c) => upcoming(c) && c.date <= SOON();
+const whenTxt = (c) => `${esc(fmtDate(c.date, { weekday: 'long', day: 'numeric', month: 'long' }))}${c.time ? ' · ore ' + esc(c.time) : c.kind === 'allenamento' ? ' · orario da definire' : ''}`;
 
 /** Risposte in attesa del giocatore collegato, per i pallini sulla barra. */
 export async function pendingCounts() {
   const ident = me();
   if (!ident) return { partita: 0, allenamento: 0 };
-  const items = (await listConvocations()).filter((c) => upcoming(c) && c.players.includes(ident.id) && !c.closed);
+  const items = (await listConvocations()).filter((c) => soon(c) && c.players.includes(ident.id) && !c.closed);
   if (!items.length) return { partita: 0, allenamento: 0 };
   const mine = (await post('mine', { playerId: ident.id, pin: ident.pin })).mine || {};
   const p = items.filter((c) => !mine[c.id]);
@@ -54,7 +57,10 @@ export function playerConvView(kind) {
     let items = [], mine = {};
     try {
       const all = (await listConvocations()).filter((c) => c.players.includes(ident.id) && (kind === 'allenamento' ? c.kind === 'allenamento' : c.kind !== 'allenamento'));
-      items = all.filter(upcoming);
+      const showAll = sessionStorage.getItem('convAll' + kind) === '1';
+      var hidden = all.filter((c) => upcoming(c) && !soon(c)).length;
+      items = all.filter(showAll ? upcoming : soon);
+      var moreBtn = !showAll && hidden ? `<button class="btn block mt" id="showall">Mostra anche i successivi (${hidden})</button>` : '';
       if (all.length) mine = (await post('mine', { playerId: ident.id, pin: ident.pin })).mine || {};
       // riepilogo presenze del ragazzo
       const past = all.filter((c) => !upcoming(c));
@@ -76,7 +82,9 @@ export function playerConvView(kind) {
             ? `<div class="pa-row mt"><button class="pa-btn pa-p ${r?.r === 'si' ? 'on' : ''}" data-yes="${c.id}">P<small>presente</small></button><button class="pa-btn pa-a ${r?.r === 'no' ? 'on' : ''}" data-no="${c.id}">A<small>assente</small></button></div>`
             : `<div class="row gap mt"><button class="btn grow conv-yes ${r?.r === 'si' ? 'primary' : ''}" data-yes="${c.id}">${L.yes}</button><button class="btn grow conv-no ${r?.r === 'no' ? 'danger' : ''}" data-no="${c.id}">${L.no}</button></div>`}
         </div>`;
-      }).join('') : `<div class="empty"><div class="empty-icon">${L.icon}</div><p>${kind === 'partita' ? 'Nessuna convocazione in arrivo.' : 'Nessun allenamento in programma.'}</p></div>`}`;
+      }).join('') : `<div class="empty"><div class="empty-icon">${L.icon}</div><p>${kind === 'partita' ? 'Nessuna convocazione nei prossimi 14 giorni.' : 'Nessun allenamento nei prossimi 14 giorni.'}</p></div>`}${moreBtn}`;
+    const sa = $('#showall', root);
+    if (sa) sa.onclick = () => { sessionStorage.setItem('convAll' + kind, '1'); route(); };
 
     const answer = async (convId, r) => {
       let note = '';
@@ -114,13 +122,18 @@ export function misterConvView(kind) {
     let team = sessionStorage.getItem('convTeam') || 'tutte';
     const show = sessionStorage.getItem('convShow') || 'prossime';
     const inTeam = items.filter((c) => team === 'tutte' || c.teamId === team);
-    const list = inTeam.filter((c) => (show === 'prossime' ? upcoming(c) : !upcoming(c))).sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time) * (show === 'prossime' ? 1 : -1));
+    const mAll = sessionStorage.getItem('mConvAll') === '1';
+    const hiddenM = show === 'prossime' && !mAll ? inTeam.filter((c) => upcoming(c) && !soon(c)).length : 0;
+    const list = inTeam.filter((c) => (show === 'prossime' ? (mAll ? upcoming(c) : soon(c)) : !upcoming(c))).sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time) * (show === 'prossime' ? 1 : -1));
 
     root.innerHTML = `
       <div class="chips mb"><button class="chip-btn ${team === 'tutte' ? 'on' : ''}" data-t="tutte">Tutte</button>${teams.map((t) => `<button class="chip-btn ${team === t.id ? 'on' : ''}" data-t="${t.id}">${esc(t.name)}</button>`).join('')}</div>
       <div class="seg">${[['prossime', 'Prossimi'], ['passate', 'Passati'], ...(kind === 'allenamento' ? [['stat', '📊 Presenze']] : [])].map(([k, l]) => `<label><input type="radio" name="cs" value="${k}" ${show === k ? 'checked' : ''}><span>${l}</span></label>`).join('')}</div>
       ${show === 'stat' ? statsHtml(inTeam, resp, byId) : list.length ? list.map((c) => convCard(c, resp[c.id] || {}, byId, teams, kind)).join('')
-        : `<div class="empty"><div class="empty-icon">${L.icon}</div><p>${kind === 'partita' ? 'Nessuna convocazione. Usa ＋ oppure “📋 Convoca” dalla partita.' : 'Nessun allenamento. Usa ＋ per crearli (anche ripetuti ogni settimana).'}</p></div>`}`;
+        : `<div class="empty"><div class="empty-icon">${L.icon}</div><p>${kind === 'partita' ? 'Nessuna convocazione. Usa ＋ oppure “📋 Convoca” dalla partita.' : 'Nessun allenamento nei prossimi 14 giorni. Usa ＋ per crearli (anche ripetuti ogni settimana).'}</p></div>`}
+      ${hiddenM ? `<button class="btn block mt" id="mall">Mostra anche i successivi (${hiddenM})</button>` : ''}`;
+    const ma = $('#mall', root);
+    if (ma) ma.onclick = () => { sessionStorage.setItem('mConvAll', '1'); route(); };
     fillPhotos(root);
     $$('[data-t]', root).forEach((b) => (b.onclick = () => { sessionStorage.setItem('convTeam', b.dataset.t); route(); }));
     $$('input[name=cs]', root).forEach((i) => (i.onchange = () => { sessionStorage.setItem('convShow', i.value); route(); }));

@@ -452,3 +452,11 @@ body.no-tabs { padding-bottom: var(--safe-b); }
 .vlabel { display: inline-block; margin-top: 4px; background: #e6f6ea; color: #2f9e44; font-weight: 700; font-size: 13px; padding: 3px 10px; border-radius: 99px; }
 
 .vstar.vstar-lg { width: 28px; height: 28px; max-width: 28px; max-height: 28px; font-size: 16px; right: 0; bottom: 0; border-width: 3px; }
+
+/* Video partita */
+.video-period { border-top: 1px solid var(--line); padding-top: 10px; margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+.video-row { display: flex; align-items: center; gap: 6px; background: var(--bg); border-radius: 10px; padding: 6px 8px; }
+.video-n { width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 12px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex: none; }
+.video-link { color: var(--text); font-size: 14px; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.video-link small { display: block; color: var(--muted); font-weight: 400; font-size: 11px; }
+.btn-text:disabled { opacity: .25; }

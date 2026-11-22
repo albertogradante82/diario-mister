@@ -116,6 +116,7 @@ export async function homeView(root) {
       <a class="quick-btn" href="#/convocazioni"><span>⚽</span>Convocazioni partita</a>
       <a class="quick-btn" href="#/allenamenti"><span>🏃</span>Presenze allenamenti</a>
       <a class="quick-btn" href="#/bacheca"><span>📣</span>Bacheca</a>
+      <a class="quick-btn" href="#/video"><span>🎬</span>Video partite</a>
       <a class="quick-btn" href="#/partita/nuova"><span>➕</span>Nuova partita</a>
       <a class="quick-btn" href="#/giocatore/nuovo"><span>👤</span>Nuovo giocatore</a>
       <a class="quick-btn" href="#/calendario"><span>📆</span>Calendario</a>

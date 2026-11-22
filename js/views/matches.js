@@ -9,6 +9,7 @@ import {
 import { barChart, pitchHeatmap } from '../charts.js';
 import { parseTracking, checkMeta } from '../tracking.js';
 import { editConvocation } from './convocazioni.js';
+import { videoCard } from './video.js';
 
 const PERIOD_NAMES = ['1° tempo', '2° tempo', '3° tempo'];
 const COMPETITIONS = ['Campionato', 'Torneo', 'Amichevole', 'Coppa'];
@@ -195,6 +196,7 @@ export async function matchView(root, id) {
       <button class="btn block mt" id="convoca">📋 Convoca i ragazzi (rispondono dall'app)</button>
       <a class="btn primary block mt" href="#/partita/${id}/live">${m.status === 'finita' ? '✏️ Apri tagging eventi' : m.status === 'in corso' ? '▶ Continua live' : '▶ Avvia live'}</a>
     </div>
+    <div id="videoBox"></div>
     <div class="tabs" id="tabs">
       ${[['giocatori', 'Giocatori'], ['squadra', 'Squadra'], ['eventi', `Eventi (${events.length})`], ['minuti', 'Formazioni'], ['tracking', 'Tracking']]
         .map(([k, l]) => `<button data-tab="${k}" class="${k === tab ? 'active' : ''}">${l}</button>`).join('')}
@@ -262,6 +264,7 @@ export async function matchView(root, id) {
       <button class="btn danger block mt" data-action="delTracking">Elimina dati di tracking</button>` : ''}
     </section>`;
 
+  videoCard($('#videoBox', root), m);
   $('#convoca', root).onclick = () => editConvocation(null, { code: null, match: m, kind: 'partita' });
   $$('#tabs button', root).forEach((b) => (b.onclick = () => {
     sessionStorage.setItem('matchTab', b.dataset.tab);

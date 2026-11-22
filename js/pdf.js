@@ -225,3 +225,74 @@ function drawHeat(doc, x, y, w, h, heat) {
   doc.line(x + w / 2, y, x + w / 2, y + h);
   doc.circle(x + w / 2, y + h / 2, h * 0.14);
 }
+
+/**
+ * Scheda giocatore per l'area giocatori (dati ufficiali + dati personali verificati con il PIN).
+ * info = { name, number, role, team, birthDate, phone, email, photo, official:[{team,gol,assist,rigori}], teamStats, results:[{date,label,score}] }
+ */
+export async function exportPublicPlayerPdf(info) {
+  const { jsPDF } = await loadJsPDF();
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const W = 210, M = 14;
+  const blue = [28, 100, 200], gray = [110, 110, 120], dark = [25, 25, 30];
+  // intestazione
+  doc.setFillColor(...blue); doc.rect(0, 0, W, 40, 'F');
+  let tx = M;
+  if (info.photo) { try { doc.addImage(info.photo, 'JPEG', M, 6, 28, 28); tx = M + 33; } catch { /* */ } }
+  doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(20);
+  doc.text(t(info.name), tx, 17);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(11);
+  doc.text(t([info.number !== '' && info.number != null ? `#${info.number}` : '', info.role].filter(Boolean).join('  ·  ')), tx, 24);
+  doc.text(t(`ASD Calcio Palazzo  ·  ${info.team || ''}`), tx, 31);
+  doc.setFontSize(8); doc.text(t(`Generato il ${new Date().toLocaleDateString('it-IT')}`), W - M, 37, { align: 'right' });
+  let y = 52;
+  const h2 = (s) => {
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor(...blue);
+    doc.text(t(s), M, y); doc.setDrawColor(...blue); doc.setLineWidth(0.3); doc.line(M, y + 1.5, W - M, y + 1.5);
+    y += 8; doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(...dark);
+  };
+  const row = (k, v) => { doc.setTextColor(...gray); doc.text(t(k), M, y); doc.setTextColor(...dark); doc.text(t(v || '-'), M + 40, y); y += 6; };
+
+  h2('Dati personali');
+  row('Data di nascita', info.birthDate ? fmtDate(info.birthDate, { day: 'numeric', month: 'long', year: 'numeric' }) + ` (${age(info.birthDate)} anni)` : '');
+  row('Cellulare', info.phone);
+  row('Email', info.email);
+  y += 4;
+
+  h2('Statistiche ufficiali (Tuttocampo)');
+  const gol = info.official.reduce((a, m) => a + (m.gol || 0), 0), ast = info.official.reduce((a, m) => a + (m.assist || 0), 0);
+  const tiles = [['Gol', gol], ['Assist', ast], ['Gol + assist', gol + ast], ['Rigori', info.official.reduce((a, m) => a + (m.rigori || 0), 0)]];
+  const tw = (W - 2 * M - 9) / 4;
+  tiles.forEach(([l, v], i) => {
+    const x = M + i * (tw + 3);
+    doc.setFillColor(240, 244, 250); doc.roundedRect(x, y - 4, tw, 14, 2, 2, 'F');
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(14); doc.setTextColor(...dark); doc.text(String(v), x + 3, y + 3);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(...gray); doc.text(t(l), x + 3, y + 8);
+  });
+  y += 18; doc.setFontSize(10); doc.setTextColor(...dark);
+  if (info.official.length > 1) info.official.forEach((m) => { doc.text(t(`${m.team}: ${m.gol} gol, ${m.assist} assist`), M, y); y += 5.5; });
+  if (!info.official.length) { doc.setTextColor(...gray); doc.text('Nessun gol o assist ufficiale in stagione.', M, y); y += 6; }
+  y += 4;
+
+  if (info.teamStats) {
+    h2(`La squadra: ${info.team}`);
+    const s = info.teamStats;
+    doc.text(t(`${s.pos}° in classifica con ${s.pt} punti  ·  ${s.v} vittorie, ${s.n} pareggi, ${s.p} sconfitte`), M, y); y += 6;
+    if (s.gf != null) { doc.text(t(`Gol fatti ${s.gf}, subiti ${s.gs}`), M, y); y += 6; }
+    y += 4;
+  }
+
+  if (info.results && info.results.length) {
+    h2('Risultati della squadra');
+    info.results.forEach((r, i) => {
+      if (y > 280) { doc.addPage(); y = 20; }
+      if (i % 2 === 0) { doc.setFillColor(246, 247, 250); doc.rect(M - 1, y - 4, W - 2 * M + 2, 5.6, 'F'); }
+      doc.text(t(r.date), M, y); doc.text(t(r.label), M + 22, y); doc.setFont('helvetica', 'bold'); doc.text(t(r.score), W - M, y, { align: 'right' }); doc.setFont('helvetica', 'normal');
+      y += 5.6;
+    });
+  }
+  const pages = doc.getNumberOfPages();
+  for (let i = 1; i <= pages; i++) { doc.setPage(i); doc.setFontSize(7.5); doc.setTextColor(...gray); doc.text(t(`ASD Calcio Palazzo · ${info.name} · documento personale`), W / 2, 292, { align: 'center' }); }
+  const safe = info.name.replace(/[^\p{L}\p{N}]+/gu, '-').toLowerCase();
+  await shareOrDownload(doc.output('blob'), `scheda-${safe}.pdf`);
+}

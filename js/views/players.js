@@ -12,6 +12,7 @@ export async function rosterView(root) {
   const ctx = await loadSeason();
   setHeader({ title: 'Rosa', actions: `<a class="hdr-btn" href="#/giocatore/nuovo" aria-label="Nuovo giocatore">＋</a>` });
   const rows = seasonData(ctx);
+  const profs = await listProfiles();
   const tcBy = Object.fromEntries((ctx.team?.tcStats?.marcatori || []).filter((m) => m.playerId).map((m) => [m.playerId, m]));
   const groups = ROLES.map((r) => [r, ctx.players.filter((p) => p.role === r)]);
   const other = ctx.players.filter((p) => !ROLES.includes(p.role));
@@ -23,12 +24,20 @@ export async function rosterView(root) {
     : `${medExpiring.length ? `<div class="card warn-card small">🩺 Visita medica in scadenza o scaduta: ${medExpiring.map((p) => esc(fullName(p))).join(', ')}</div>` : ''}
       ${groups.filter(([, l]) => l.length).map(([role, list]) => `
       <h2 class="section">${esc(role)} <span class="muted">(${list.length})</span></h2>
-      <div class="list">${list.map((p) => {
-        const t = seasonTotals(rows, p.id);
-        return `<a class="item" href="#/giocatore/${p.id}">${avatar(p)}
-          <div class="grow"><strong>${esc(fullName(p))}</strong>
-          <div class="muted small">${p.number === '' || p.number == null ? '' : '#' + esc(p.number) + ' · '}${t.presenze ? `${t.presenze} pres. · ${Math.round(t.minuti)}′ · ` : ''}${tcBy[p.id] ? `⚽ ${tcBy[p.id].gol} gol · ${tcBy[p.id].assist} assist` : t.gol ? `${t.gol} gol` : 'nessun gol'}</div></div><span class="chev">›</span></a>`;
+      <div class="roster-grid">${list.map((p) => {
+        const tc = tcBy[p.id];
+        return `<a class="roster-card" href="#/giocatore/${p.id}"><div class="roster-photo" data-ph="${p.id}">${p.photo ? `<img src="${esc(p.photo)}" alt="">` : esc(p.number !== '' && p.number != null ? p.number : ((p.firstName || '')[0] || '') + ((p.lastName || '')[0] || ''))}</div>
+          ${p.number !== '' && p.number != null ? `<span class="roster-num">${esc(p.number)}</span>` : ''}${profs[p.id] ? '<span class="roster-ok">✓</span>' : ''}
+          <div class="roster-name">${esc(fullName(p))}</div>
+          <div class="roster-sub">${tc ? `⚽ ${tc.gol} · 🅰️ ${tc.assist}` : '&nbsp;'}</div></a>`;
       }).join('')}</div>`).join('')}`;
+  // foto inviate dai ragazzi per chi non ha ancora la foto nel profilo
+  root.querySelectorAll('[data-ph]').forEach(async (el) => {
+    const pl = ctx.players.find((x) => x.id === el.dataset.ph);
+    if (pl?.photo || !profs[el.dataset.ph]?.hasPhoto) return;
+    const ph = await getPhoto(el.dataset.ph);
+    if (ph) el.innerHTML = `<img src="${ph}" alt="">`;
+  });
 }
 
 function addDays(d, n) {
@@ -131,6 +140,7 @@ export async function playerView(root, id) {
     <div id="remote"></div>
     <button class="btn primary block mt" data-action="pdf">📄 Esporta scheda PDF</button>`;
   showRemoteProfile(root.querySelector('#remote'), p);
+  if (!p.photo) getPhoto(p.id).then((ph) => { const a = root.querySelector('.profile .avatar'); if (ph && a) a.outerHTML = `<img class="avatar" style="width:84px;height:84px" src="${ph}" alt="">`; });
 
   const drawChart = () => {
     const key = $('#metric', root).value;
@@ -150,6 +160,7 @@ export async function playerView(root, id) {
   on(root, 'pdf', async () => {
     toast('Creo il PDF…');
     try {
+      if (!p.photo && (await listProfiles())[p.id]?.hasPhoto) p.photo = await getPhoto(p.id);
       await exportPlayerPdf({ player: p, team, season: ctx.season, rows, totals: tot, trends, heat: hasTracking ? heat : null, pitch });
     } catch (e) {
       console.error(e);

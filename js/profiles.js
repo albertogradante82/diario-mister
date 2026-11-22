@@ -41,3 +41,8 @@ export async function resetPin(adminCode, id) {
 export async function serviceActive() {
   try { await call(`${API}?action=list`); return true; } catch (e) { return e.status !== 503 && e.status !== 404 ? true : false; }
 }
+
+/** Dati privati del giocatore, verificando il suo PIN. */
+export async function myPrivate(id, pin) {
+  return (await call(`${API}?action=mine`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, pin }) })).priv || {};
+}

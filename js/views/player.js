@@ -1,6 +1,8 @@
 // Accesso giocatori/genitori: sola lettura, dati pubblici (dati/pubblico.json).
 import { esc, fmtDate, today, toast, resizeImage, age, $ } from '../util.js';
-import { listProfiles, getPhoto, saveProfile } from '../profiles.js';
+import { listProfiles, getPhoto, saveProfile, myPrivate } from '../profiles.js';
+import { sheet } from '../util.js';
+import { exportPublicPlayerPdf } from '../pdf.js';
 import { setHeader } from '../app.js';
 import { PALETTE } from '../charts.js';
 
@@ -91,15 +93,17 @@ export async function playerRosterView(root) {
       const groups = ROLE_ORDER.map((r) => [r || 'Altri', list.filter((p) => (p.role || '') === r)]).filter(([, l]) => l.length);
       root.innerHTML = `${pick.html}
         ${groups.map(([role, l]) => `<h2 class="section">${esc(role)} <span class="muted">(${l.length})</span></h2>
-          <div class="list">${l.sort((a, b) => (Number(a.number) || 99) - (Number(b.number) || 99) || a.name.localeCompare(b.name)).map((p) =>
-            `<a class="item" href="#/g/giocatore/${p.id}"><span class="num-badge" data-ph="${p.id}">${esc(p.number === '' ? '–' : p.number)}</span><div class="grow">${esc(p.name)}${profs[p.id] ? ' <span class="small">✅</span>' : ''}</div><span class="chev">›</span></a>`).join('')}</div>`).join('')
+          <div class="roster-grid">${l.sort((a, b) => (Number(a.number) || 99) - (Number(b.number) || 99) || a.name.localeCompare(b.name)).map((p) =>
+            `<a class="roster-card" href="#/g/giocatore/${p.id}"><div class="roster-photo" data-ph="${p.id}">${esc(p.number === '' ? p.name.split(' ').map((w) => w[0]).join('').slice(0, 2) : p.number)}</div>
+              ${p.number !== '' ? `<span class="roster-num">${esc(p.number)}</span>` : ''}${profs[p.id] ? '<span class="roster-ok">✓</span>' : ''}
+              <div class="roster-name">${esc(p.name)}</div></a>`).join('')}</div>`).join('')
           || '<div class="empty"><p>Rosa non disponibile.</p></div>'}
         <p class="small muted mt">Tocca il tuo nome per vedere la tua scheda e completarla (foto, data di nascita, contatti). ✅ = scheda compilata.</p>`;
       bindPicker(root, draw);
       root.querySelectorAll('[data-ph]').forEach(async (el) => {
         if (!profs[el.dataset.ph]?.hasPhoto) return;
         const ph = await getPhoto(el.dataset.ph);
-        if (ph) el.outerHTML = `<img class="avatar" style="width:34px;height:34px" src="${ph}" alt="">`;
+        if (ph) el.innerHTML = `<img src="${ph}" alt="">`;
       });
     };
     draw();
@@ -178,8 +182,46 @@ export async function playerProfileView(root, id) {
       </div>
       ${official.length > 1 ? `<div class="card small">${official.map((m) => `<div>${esc(m.team)}: ${m.gol} gol, ${m.assist} assist</div>`).join('')}</div>` : ''}
       <a class="btn primary block mt" href="#/g/giocatore/${id}/modifica">${pr.updatedAt ? '✏️ Modifica la mia scheda' : '✏️ È la mia scheda: compilala'}</a>
+      ${pr.updatedAt ? '<button class="btn block mt" id="mypdf">📄 Scarica la mia scheda PDF (serve il PIN)</button>' : ''}
       <p class="small muted mt">Foto e data di nascita sono visibili a tutti nell'app. Cellulare ed email li vede solo la società.</p>`;
+    const btn = root.querySelector('#mypdf');
+    if (btn) btn.onclick = () => downloadMyPdf(d, f, pr, photo);
   });
+}
+
+function teamInfo(d, teamId) {
+  const team = d.teams.find((t) => t.id === teamId);
+  const st = team?.stats?.classifica?.find((r) => /palazzo/i.test(r.squadra)) || null;
+  const results = d.matches.filter((m) => m.teamId === teamId && m.played && m.goalsFor != null).sort((a, b) => a.date.localeCompare(b.date)).map((m) => ({
+    date: fmtDate(m.date, { day: '2-digit', month: '2-digit' }),
+    label: m.home === false ? `${m.opponent} - Palazzo` : `Palazzo - ${m.opponent}`,
+    score: m.home === false ? `${m.goalsAgainst}-${m.goalsFor}` : `${m.goalsFor}-${m.goalsAgainst}`,
+  }));
+  return { team, st, results };
+}
+
+async function downloadMyPdf(d, f, pr, photo) {
+  const { p, official } = f;
+  const priv = await sheet('Scheda PDF', (body, close) => {
+    body.innerHTML = `<p class="small muted mb">Inserisci il PIN che hai scelto quando hai compilato la scheda.</p>
+      <form id="pp" class="form"><input id="pin" type="password" inputmode="numeric" maxlength="6" placeholder="PIN" class="code-input" autocomplete="off">
+      <p class="small warn" id="perr" hidden></p><button class="btn primary block mt" id="pbtn">Scarica PDF</button></form>`;
+    setTimeout(() => body.querySelector('#pin').focus(), 300);
+    body.querySelector('#pp').onsubmit = async (e) => {
+      e.preventDefault();
+      const b = body.querySelector('#pbtn'); b.disabled = true; b.textContent = 'Verifica…';
+      try { close(await myPrivate(p.id, body.querySelector('#pin').value)); } catch (err) {
+        const el = body.querySelector('#perr'); el.hidden = false; el.textContent = err.message; b.disabled = false; b.textContent = 'Scarica PDF';
+      }
+    };
+  });
+  if (!priv) return;
+  toast('Creo il PDF…');
+  const { team, st, results } = teamInfo(d, p.teamId);
+  try {
+    await exportPublicPlayerPdf({ name: p.name, number: p.number, role: p.role, team: team?.name, birthDate: pr.birthDate, phone: priv.phone, email: priv.email,
+      photo, official, teamStats: st, results });
+  } catch (e) { toast('Errore PDF: ' + e.message, 4000); }
 }
 
 export async function playerProfileEditView(root, id) {

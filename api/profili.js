@@ -140,6 +140,17 @@ module.exports = async function handler(req, res) {
       return send(res, 200, { ok: true, newPin: !stored });
     }
 
+    if (req.method === 'POST' && action === 'mine') {
+      // il giocatore, con il suo PIN, legge i propri dati (per la scheda PDF)
+      const { id, pin } = await readBody(req);
+      if (!ID_RE.test(String(id)) || !/^\d{4,6}$/.test(String(pin || ''))) return send(res, 400, { error: 'PIN non valido.' });
+      if (await limited(cfg, `rl:pin:${id}`, 10, 3600)) return send(res, 429, { error: 'Troppi tentativi con il PIN: riprova tra un\'ora.' });
+      const [stored, priv] = await pipeline(cfg, [['HGET', 'prof:pin', id], ['HGET', 'prof:priv', id]]);
+      if (!stored) return send(res, 404, { error: 'Prima compila la tua scheda e scegli un PIN.' });
+      if (!safeEq(stored, pinHash(id, String(pin)))) return send(res, 403, { error: 'PIN errato.' });
+      return send(res, 200, { priv: priv ? JSON.parse(priv) : {} });
+    }
+
     if (req.method === 'POST' && action === 'resetpin') {
       if (await limited(cfg, `rl:adm:${ip(req)}`, 30, 900)) return send(res, 429, { error: 'Troppi tentativi, riprova più tardi.' });
       if (!isAdmin(req)) return send(res, 401, { error: 'Password amministratore errata.' });

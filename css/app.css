@@ -363,3 +363,7 @@ a.tile { color: var(--text); display: block; }
 
 body.no-tabs .tabbar { display: none; }
 body.no-tabs { padding-bottom: var(--safe-b); }
+
+.table.standings tr.us td { background: var(--accent-soft); font-weight: 700; color: var(--accent); }
+.table.standings td:nth-child(2) { text-align: left; white-space: normal; min-width: 120px; }
+.table.standings th:nth-child(2) { text-align: left; }

@@ -312,6 +312,9 @@ async function mergeRose(json) {
     Object.entries(cur).forEach(([k, v]) => { if (filled(v) && k !== 'custom' && k !== 'customFields') out[k] = v; });
     // un risultato importato chiude la partita
     if (imp.status === 'finita') out.status = 'finita';
+    // dati ufficiali (Tuttocampo): sostituiscono quelli precedenti
+    if (imp.tcStats) out.tcStats = imp.tcStats;
+    if (imp.source === 'tuttocampo') ['date', 'time', 'status', 'opponent', 'home'].forEach((k) => { if (imp[k] != null) out[k] = imp[k]; });
     if (imp.custom || cur.custom) {
       out.custom = { ...(imp.custom || {}) };
       Object.entries(cur.custom || {}).forEach(([k, v]) => { if (filled(v)) out.custom[k] = v; });

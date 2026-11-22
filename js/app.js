@@ -123,7 +123,7 @@ const playerRoutes = [
 
 const TABS = {
   mister: [['#/home', 'home', '🏠', 'Home'], ['#/partite', 'partite', '📅', 'Partite'], ['#/rosa', 'rosa', '👥', 'Rosa'], ['#/analisi', 'analisi', '📊', 'Analisi'], ['#/altro', 'altro', '⚙️', 'Altro']],
-  giocatore: [['#/g/calendario', 'g-cal', '📅', 'Calendario'], ['#/g/rose', 'g-rose', '👥', 'Squadre'], ['#/g/marcatori', 'g-marc', '⚽', 'Marcatori'], ['#/g/esci', 'g-esci', '🚪', 'Esci']],
+  giocatore: [['#/g/calendario', 'g-cal', '📅', 'Calendario'], ['#/g/rose', 'g-rose', '👥', 'Squadre'], ['#/g/marcatori', 'g-marc', '🏆', 'Classifica'], ['#/g/esci', 'g-esci', '🚪', 'Esci']],
 };
 let tabsFor = null;
 function renderTabbar(role) {
@@ -217,7 +217,7 @@ function setTab(tab) {
 
 // ---------- Avvio ----------
 
-export const APP_VERSION = '1.7.1';
+export const APP_VERSION = '1.8.0';
 let swReg = null;
 
 /** Controlla subito se c'è una versione nuova dell'app; restituisce true se è stata trovata. */

@@ -22,6 +22,7 @@ export async function homeView(root) {
   const last = [...played].reverse().slice(0, 3);
   const scorers = ctx.players.map((p) => ({ p, t: seasonTotals(rows, p.id) })).filter((x) => x.t.gol > 0).sort((a, b) => b.t.gol - a.t.gol || b.t.assist - a.t.assist).slice(0, 5);
   const trends = detectTrends(rows, ctx.players).slice(0, 4);
+  const tc = ctx.team?.tcStats || null;
   const soon = new Date(); soon.setDate(soon.getDate() + 30);
   const medical = ctx.players.filter((p) => p.medicalExpiry && p.medicalExpiry <= soon.toISOString().slice(0, 10));
   const lastBackup = await db.getMeta('lastBackup');
@@ -76,9 +77,17 @@ export async function homeView(root) {
         <span class="score ${out}">${m.home === false ? `${s.subiti} – ${s.fatti}` : `${s.fatti} – ${s.subiti}`}</span></a>`;
     }).join('')}</div>` : ''}
 
+    ${tc ? standingsCard(tc) : ''}
+
     ${scorers.length ? `<h2 class="section">Marcatori</h2>
     <div class="list">${scorers.map(({ p, t }, i) => `<a class="item" href="#/giocatore/${p.id}"><span class="rank">${i + 1}</span>${avatar(p, 34)}
-      <div class="grow">${esc(fullName(p))}</div><strong>${t.gol}</strong><span class="muted small">gol${t.assist ? ` · ${t.assist} ast` : ''}</span></a>`).join('')}</div>` : ''}
+      <div class="grow">${esc(fullName(p))}</div><strong>${t.gol}</strong><span class="muted small">gol${t.assist ? ` · ${t.assist} ast` : ''}</span></a>`).join('')}</div>`
+    : tc && tc.marcatori?.length ? `<h2 class="section">Marcatori <span class="muted">· Tuttocampo</span></h2>
+    <div class="list">${tc.marcatori.filter((m) => m.gol > 0).map((m, i) => {
+      const p = ctx.players.find((x) => x.id === m.playerId);
+      return `<a class="item" ${p ? `href="#/giocatore/${p.id}"` : ''}><span class="rank">${i + 1}</span>${p ? avatar(p, 34) : ''}
+        <div class="grow">${esc(p ? fullName(p) : m.name)}</div><strong>${m.gol}</strong><span class="muted small">gol${m.rigori ? ` (${m.rigori} rig.)` : ''}${m.assist ? ` · ${m.assist} ast` : ''}</span></a>`;
+    }).join('')}</div>` : ''}
 
     ${trends.length ? `<h2 class="section">Tendenze</h2>
     <div class="list">${trends.map((a) => `<a class="item" href="#/giocatore/${a.player.id}"><span class="trend ${a.better ? 'up' : 'down'}">${a.better ? '▲' : '▼'}</span>
@@ -104,4 +113,16 @@ export async function homeView(root) {
     await setCurrent(m.teamId, m.seasonId);
     location.hash = `#/partita/${m.id}`;
   }));
+}
+
+/** Classifica del campionato (dati Tuttocampo), con il Palazzo evidenziato. */
+export function standingsCard(tc) {
+  const rows = tc.classifica || [];
+  if (!rows.length) return '';
+  return `<h2 class="section">Classifica <span class="muted">· ${esc(tc.campionato || '')}</span></h2>
+    <div class="table-wrap"><table class="table standings">
+      <thead><tr><th>#</th><th>Squadra</th><th>PT</th><th>G</th><th>V</th><th>N</th><th>P</th><th>DR</th></tr></thead>
+      <tbody>${rows.map((r) => `<tr class="${/palazzo/i.test(r.squadra) ? 'us' : ''}"><td>${r.pos}</td><td>${esc(r.squadra)}</td><td><b>${r.pt}</b></td><td>${r.g}</td><td>${r.v}</td><td>${r.n}</td><td>${r.p}</td><td>${r.dr > 0 ? '+' : ''}${r.dr}</td></tr>`).join('')}</tbody>
+    </table></div>
+    <p class="small muted">Fonte: ${esc(tc.fonte || 'Tuttocampo')}, aggiornata al ${esc(fmtDate(tc.aggiornato))}${tc.classificaCompleta === false ? ' · classifica parziale' : ''}.</p>`;
 }

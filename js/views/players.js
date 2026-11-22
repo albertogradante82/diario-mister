@@ -48,6 +48,7 @@ export async function playerView(root, id) {
   const played = rows.filter((r) => r.players[p.id] && r.players[p.id].minuti > 0);
   const trends = detectTrends(rows, [p]);
   const team = ctx.team;
+  const tcLine = (team?.tcStats?.marcatori || []).find((m) => m.playerId === p.id) || null;
   const heat = mergeHeatmaps(played.flatMap((r) => r.tracking.filter((t) => t.playerId === p.id).map((t) => t.heatmap)));
   const pitch = played.flatMap((r) => r.tracking.filter((t) => t.playerId === p.id).map((t) => t.pitch)).find(Boolean);
   const hasTracking = tot.distanza != null;
@@ -73,6 +74,8 @@ export async function playerView(root, id) {
       ${tile('Passaggi', `${tot.passaggiOk}/${tot.passaggi}`)}${tile('Precisione', pct(tot.precisione))}${tile('Recuperi', tot.recuperi)}
       ${tile('Palle perse', tot.perse)}${hasTracking ? tile('Km totali', num(tot.distanza / 1000, 1)) + tile('Vel. max', num(tot.velMax, 1)) : ''}
     </div>
+
+    ${tcLine ? `<div class="card small">📊 <strong>Tuttocampo</strong> (al ${esc(fmtDate(team.tcStats.aggiornato))}): <strong>${tcLine.gol}</strong> gol${tcLine.rigori ? ` (${tcLine.rigori} su rigore)` : ''}, <strong>${tcLine.assist}</strong> assist</div>` : ''}
 
     ${trends.length ? `<h2 class="section">Tendenze ultime 3 partite</h2><div class="list">${trends.map((t) => `<div class="item"><span class="trend ${t.better ? 'up' : 'down'}">${t.better ? '▲' : '▼'}</span><div class="grow">${esc(t.label)}<div class="muted small">${esc(t.text)}</div></div></div>`).join('')}</div>` : ''}
 

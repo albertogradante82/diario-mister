@@ -98,21 +98,37 @@ export async function playerRosterView(root) {
   });
 }
 
-// ---------- Marcatori ----------
+// ---------- Classifica e marcatori ----------
 
 export async function playerScorersView(root) {
-  setHeader({ title: 'Marcatori' });
+  setHeader({ title: 'Classifica' });
   await withData(root, (d) => {
     const color = teamColors(d.teams);
     const draw = () => {
       let pick = teamPicker(d.teams, color);
       if (!d.teams.some((t) => t.id === pick.sel)) { sessionStorage.setItem('pTeam', d.teams[0]?.id); pick = teamPicker(d.teams, color); }
-      const count = {};
-      d.matches.filter((m) => m.teamId === pick.sel).forEach((m) => (m.scorers || []).forEach((n) => { if (n) count[n] = (count[n] || 0) + 1; }));
-      const rows = Object.entries(count).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+      const team = d.teams.find((t) => t.id === pick.sel);
+      const st = team?.stats;
+      // marcatori: dati ufficiali se presenti, altrimenti dai tabellini registrati
+      let scorers = (st?.marcatori || []).filter((m) => m.gol > 0).map((m) => ({ name: m.name, gol: m.gol, rig: m.rigori, ast: m.assist }));
+      if (!scorers.length) {
+        const count = {};
+        d.matches.filter((m) => m.teamId === pick.sel).forEach((m) => (m.scorers || []).forEach((n) => { if (n) count[n] = (count[n] || 0) + 1; }));
+        scorers = Object.entries(count).map(([name, gol]) => ({ name, gol }));
+      }
+      scorers.sort((a, b) => b.gol - a.gol || a.name.localeCompare(b.name));
+      const assists = (st?.marcatori || []).filter((m) => m.assist > 0).sort((a, b) => b.assist - a.assist);
       root.innerHTML = `${pick.html}
-        ${rows.length ? `<div class="list">${rows.map(([n, g], i) => `<div class="item"><span class="rank">${i + 1}</span><div class="grow">${esc(n)}</div><strong>${g}</strong><span class="muted small">gol</span></div>`).join('')}</div>`
-          : '<div class="empty"><div class="empty-icon">⚽</div><p>Ancora nessun gol registrato per questa squadra.</p></div>'}`;
+        ${st?.classifica?.length ? `<h2 class="section">Classifica</h2>
+          <div class="table-wrap"><table class="table standings">
+            <thead><tr><th>#</th><th>Squadra</th><th>PT</th><th>G</th><th>V</th><th>N</th><th>P</th><th>DR</th></tr></thead>
+            <tbody>${st.classifica.map((r) => `<tr class="${/palazzo/i.test(r.squadra) ? 'us' : ''}"><td>${r.pos}</td><td>${esc(r.squadra)}</td><td><b>${r.pt}</b></td><td>${r.g}</td><td>${r.v}</td><td>${r.n}</td><td>${r.p}</td><td>${r.dr > 0 ? '+' : ''}${r.dr}</td></tr>`).join('')}</tbody>
+          </table></div>` : ''}
+        <h2 class="section">Marcatori</h2>
+        ${scorers.length ? `<div class="list">${scorers.map((m, i) => `<div class="item"><span class="rank">${i + 1}</span><div class="grow">${esc(m.name)}</div><strong>${m.gol}</strong><span class="muted small">gol${m.rig ? ` (${m.rig} rig.)` : ''}</span></div>`).join('')}</div>`
+          : '<div class="empty"><div class="empty-icon">⚽</div><p>Ancora nessun gol registrato per questa squadra.</p></div>'}
+        ${assists.length ? `<h2 class="section">Assist</h2><div class="list">${assists.map((m, i) => `<div class="item"><span class="rank">${i + 1}</span><div class="grow">${esc(m.name)}</div><strong>${m.assist}</strong><span class="muted small">assist</span></div>`).join('')}</div>` : ''}
+        ${st ? `<p class="small muted">Fonte: ${esc(st.fonte || 'Tuttocampo')}, aggiornata al ${esc(fmtDate(st.aggiornato))}.</p>` : ''}`;
       bindPicker(root, draw);
     };
     draw();

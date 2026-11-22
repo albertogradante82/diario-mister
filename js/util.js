@@ -173,7 +173,7 @@ export function fullName(p) {
 export function avatar(p, size = 44) {
   const st = `width:${size}px;height:${size}px;font-size:${Math.round(size * 0.38)}px`;
   return p && p.photo
-    ? `<img class="avatar" style="${st}" src="${esc(p.photo)}" alt="">`
+    ? `<span class="avatar" style="${st}"${p.id ? ` data-rphoto="${esc(p.id)}"` : ''}><img src="${esc(p.photo)}" alt=""></span>`
     : `<span class="avatar" style="${st}"${p && p.id ? ` data-rphoto="${esc(p.id)}"` : ''}>${esc(p && p.number != null && p.number !== '' ? p.number : initials(p || {}))}</span>`;
 }
 

@@ -97,7 +97,7 @@ export async function playerRosterView(root) {
         ${groups.map(([role, l]) => `<h2 class="section">${esc(role)} <span class="muted">(${l.length})</span></h2>
           <div class="roster-grid">${l.sort((a, b) => (Number(a.number) || 99) - (Number(b.number) || 99) || a.name.localeCompare(b.name)).map((p) =>
             `<a class="roster-card" href="#/g/giocatore/${p.id}"><div class="roster-photo" data-ph="${p.id}">${esc(p.number === '' ? p.name.split(' ').map((w) => w[0]).join('').slice(0, 2) : p.number)}</div>
-              ${p.number !== '' ? `<span class="roster-num">${esc(p.number)}</span>` : ''}${profs[p.id] ? '<span class="roster-ok">✓</span>' : ''}
+              ${p.number !== '' ? `<span class="roster-num">${esc(p.number)}</span>` : ''}${profs[p.id] ? '<span class="roster-ok" title="Profilo certificato">★</span>' : ''}
               <div class="roster-name">${esc(p.name)}</div></a>`).join('')}</div>`).join('')
           || '<div class="empty"><p>Rosa non disponibile.</p></div>'}
         <p class="small muted mt">Tocca il tuo nome per vedere la tua scheda e completarla (foto, data di nascita, contatti). ✅ = scheda compilata.</p>`;
@@ -181,8 +181,9 @@ export async function playerProfileView(root, id) {
     const gol = official.reduce((a, m) => a + (m.gol || 0), 0), ast = official.reduce((a, m) => a + (m.assist || 0), 0);
     root.innerHTML = `
       <div class="card center-col">
-        ${photo ? `<img class="avatar" style="width:110px;height:110px" src="${photo}" alt="">` : `<span class="avatar" style="width:110px;height:110px;font-size:40px">${esc(p.number === '' ? p.name.split(' ').map((w) => w[0]).join('').slice(0, 2) : p.number)}</span>`}
+        ${photo ? `<span class="avatar" style="width:110px;height:110px" data-rphoto="${id}"><img src="${photo}" alt=""></span>` : `<span class="avatar" style="width:110px;height:110px;font-size:40px" data-rphoto="${id}">${esc(p.number === '' ? p.name.split(' ').map((w) => w[0]).join('').slice(0, 2) : p.number)}</span>`}
         <h2 class="mt">${esc(p.name)}</h2>
+        ${pr.updatedAt ? '<div class="vlabel">★ Profilo certificato</div>' : ''}
         <div class="muted">${esc(team?.name || '')}${p.role ? ' · ' + esc(p.role) : ''}${p.number !== '' ? ' · #' + esc(p.number) : ''}</div>
         ${pr.birthDate ? `<div class="mt">🎂 ${esc(fmtDate(pr.birthDate, { day: 'numeric', month: 'long', year: 'numeric' }))} (${age(pr.birthDate)} anni)</div>` : ''}
       </div>

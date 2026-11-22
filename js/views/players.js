@@ -27,7 +27,7 @@ export async function rosterView(root) {
       <div class="roster-grid">${list.map((p) => {
         const tc = tcBy[p.id];
         return `<a class="roster-card" href="#/giocatore/${p.id}"><div class="roster-photo" data-ph="${p.id}">${p.photo ? `<img src="${esc(p.photo)}" alt="">` : esc(p.number !== '' && p.number != null ? p.number : ((p.firstName || '')[0] || '') + ((p.lastName || '')[0] || ''))}</div>
-          ${p.number !== '' && p.number != null ? `<span class="roster-num">${esc(p.number)}</span>` : ''}${profs[p.id] ? '<span class="roster-ok">✓</span>' : ''}
+          ${p.number !== '' && p.number != null ? `<span class="roster-num">${esc(p.number)}</span>` : ''}${profs[p.id] ? '<span class="roster-ok" title="Profilo certificato">★</span>' : ''}
           <div class="roster-name">${esc(fullName(p))}</div>
           <div class="roster-sub">${tc ? `⚽ ${tc.gol} · 🅰️ ${tc.assist}` : '&nbsp;'}</div></a>`;
       }).join('')}</div>`).join('')}`;
@@ -140,7 +140,7 @@ export async function playerView(root, id) {
     <div id="remote"></div>
     <button class="btn primary block mt" data-action="pdf">📄 Esporta scheda PDF</button>`;
   showRemoteProfile(root.querySelector('#remote'), p);
-  if (!p.photo) getPhoto(p.id).then((ph) => { const a = root.querySelector('.profile .avatar'); if (ph && a) a.outerHTML = `<img class="avatar" style="width:84px;height:84px" src="${ph}" alt="">`; });
+  if (!p.photo) getPhoto(p.id).then((ph) => { const a = root.querySelector('.profile .avatar'); if (ph && a) { const star = a.querySelector('.vstar'); a.innerHTML = `<img src="${ph}" alt="">`; if (star) a.appendChild(star); } });
 
   const drawChart = () => {
     const key = $('#metric', root).value;

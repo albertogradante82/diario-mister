@@ -56,17 +56,24 @@ export async function myPrivate(id, pin) {
  * che non ha già un'immagine (es. avatar con le iniziali).
  */
 export async function fillPhotos(root) {
-  const els = [...root.querySelectorAll('[data-rphoto]')].filter((el) => !el.querySelector('img') && el.tagName !== 'IMG');
-  if (!els.length) return;
+  const all = [...root.querySelectorAll('[data-rphoto]')];
+  if (!all.length) return;
   const profs = await listProfiles();
+  // ★ verde = profilo certificato (scheda compilata dal ragazzo con il suo PIN)
+  all.forEach((el) => {
+    if (!profs[el.dataset.rphoto] || el.querySelector('.vstar')) return;
+    el.classList.add('verified');
+    const big = parseInt(el.style.width, 10) >= 60 || el.offsetWidth >= 60;
+    el.insertAdjacentHTML('beforeend', `<i class="vstar${big ? ' vstar-lg' : ''}" title="Profilo certificato">★</i>`);
+  });
+  const els = all.filter((el) => !el.querySelector('img'));
   els.forEach(async (el) => {
     const id = el.dataset.rphoto;
     if (!profs[id]?.hasPhoto) return;
     const ph = await getPhoto(id);
     if (!ph || !el.isConnected && !root.contains(el)) return;
-    const size = el.style.width || el.offsetWidth + 'px';
-    el.innerHTML = `<img src="${ph}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
-    el.style.padding = '0'; el.style.overflow = 'hidden';
-    if (size && size !== '0px') { el.style.width = size; el.style.height = size; }
+    const star = el.querySelector('.vstar');
+    el.innerHTML = `<img src="${ph}" alt="">`;
+    if (star) el.appendChild(star);
   });
 }

@@ -1,0 +1,17 @@
+{
+  "name": "Diario del Mister – Calcio giovanile",
+  "short_name": "Mister",
+  "description": "Rosa, partite, eventi live e statistiche per allenatori di calcio giovanile.",
+  "lang": "it",
+  "start_url": "./#/partite",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f2f3f7",
+  "theme_color": "#1c64c8",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

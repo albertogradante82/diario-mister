@@ -1,0 +1,176 @@
+import * as db from './db.js';
+import { esc, $, toast, pick } from './util.js';
+import { matchesView, matchEditView, matchView, liveView } from './views/matches.js';
+import { rosterView, playerView, playerEditView } from './views/players.js';
+import { analysisView } from './views/analysis.js';
+import { moreView, teamEditView, onboardingView } from './views/more.js';
+
+// ---------- Stato globale (squadra e stagione selezionate) ----------
+
+export const state = { teamId: null, seasonId: null };
+
+export async function loadCurrent() {
+  const cur = await db.getMeta('current', {});
+  const teams = await db.all('teams');
+  let team = teams.find((t) => t.id === cur.teamId) || teams[0] || null;
+  let season = null;
+  if (team) {
+    const seasons = await db.where('seasons', 'teamId', team.id);
+    season = seasons.find((s) => s.id === cur.seasonId) || seasons.sort((a, b) => b.name.localeCompare(a.name))[0] || null;
+  }
+  state.teamId = team?.id || null;
+  state.seasonId = season?.id || null;
+  return { team, season, teams };
+}
+
+export async function setCurrent(teamId, seasonId) {
+  state.teamId = teamId;
+  state.seasonId = seasonId;
+  await db.setMeta('current', { teamId, seasonId });
+}
+
+/** Carica tutti i dati della stagione corrente. */
+export async function loadSeason(seasonId = state.seasonId) {
+  const season = await db.get('seasons', seasonId);
+  const team = season ? await db.get('teams', season.teamId) : null;
+  const players = (await db.where('players', 'seasonId', seasonId)).sort(byNumber);
+  const matches = (await db.where('matches', 'seasonId', seasonId)).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  const ids = new Set(matches.map((m) => m.id));
+  const eventsByMatch = {}, trackingByMatch = {};
+  (await db.all('events')).forEach((e) => { if (ids.has(e.matchId)) (eventsByMatch[e.matchId] = eventsByMatch[e.matchId] || []).push(e); });
+  (await db.all('tracking')).forEach((t) => { if (ids.has(t.matchId)) (trackingByMatch[t.matchId] = trackingByMatch[t.matchId] || []).push(t); });
+  return { team, season, players, matches, eventsByMatch, trackingByMatch };
+}
+
+export function byNumber(a, b) {
+  const na = a.number === '' || a.number == null ? 999 : Number(a.number);
+  const nb = b.number === '' || b.number == null ? 999 : Number(b.number);
+  return na - nb || (a.lastName || '').localeCompare(b.lastName || '');
+}
+
+// ---------- Header ----------
+
+export function setHeader({ title = '', back = null, actions = '' } = {}) {
+  $('#hdr-title').textContent = title;
+  const b = $('#hdr-back');
+  b.hidden = !back;
+  b.onclick = back ? () => (back === true ? history.back() : (location.hash = back)) : null;
+  $('#hdr-actions').innerHTML = actions;
+}
+
+async function renderContext() {
+  const { team, season } = await loadCurrent();
+  const el = $('#ctx');
+  el.innerHTML = team
+    ? `<button class="ctx-btn" id="ctx-team">${esc(team.name)} ▾</button><button class="ctx-btn" id="ctx-season">${esc(season ? season.name : 'Nessuna stagione')} ▾</button>`
+    : '';
+  if (!team) return;
+  $('#ctx-team').onclick = async () => {
+    const teams = await db.all('teams');
+    const id = await pick('Squadra', [...teams.map((t) => ({ value: t.id, label: t.name, sub: t.category })), { value: '__new', label: '+ Nuova squadra' }]);
+    if (!id) return;
+    if (id === '__new') { location.hash = '#/squadra/nuova'; return; }
+    const seasons = (await db.where('seasons', 'teamId', id)).sort((a, b) => b.name.localeCompare(a.name));
+    await setCurrent(id, seasons[0]?.id || null);
+    route();
+  };
+  $('#ctx-season').onclick = async () => {
+    const seasons = (await db.where('seasons', 'teamId', team.id)).sort((a, b) => b.name.localeCompare(a.name));
+    const id = await pick('Stagione', [...seasons.map((s) => ({ value: s.id, label: s.name })), { value: '__new', label: '+ Nuova stagione' }]);
+    if (!id) return;
+    if (id === '__new') { location.hash = `#/squadra/${team.id}`; return; }
+    await setCurrent(team.id, id);
+    route();
+  };
+}
+
+// ---------- Router ----------
+
+const routes = [
+  [/^#\/partite$/, matchesView, 'partite'],
+  [/^#\/partita\/nuova$/, (r) => matchEditView(r, null), 'partite'],
+  [/^#\/partita\/([^/]+)\/modifica$/, (r, id) => matchEditView(r, id), 'partite'],
+  [/^#\/partita\/([^/]+)\/live$/, liveView, 'partite'],
+  [/^#\/partita\/([^/]+)$/, matchView, 'partite'],
+  [/^#\/rosa$/, rosterView, 'rosa'],
+  [/^#\/giocatore\/nuovo$/, (r) => playerEditView(r, null), 'rosa'],
+  [/^#\/giocatore\/([^/]+)\/modifica$/, (r, id) => playerEditView(r, id), 'rosa'],
+  [/^#\/giocatore\/([^/]+)$/, playerView, 'rosa'],
+  [/^#\/analisi$/, analysisView, 'analisi'],
+  [/^#\/altro$/, moreView, 'altro'],
+  [/^#\/squadra\/nuova$/, (r) => teamEditView(r, null), 'altro'],
+  [/^#\/squadra\/([^/]+)$/, (r, id) => teamEditView(r, id), 'altro'],
+];
+
+let cleanup = null;
+let navToken = 0;
+
+/**
+ * Ogni vista viene disegnata in un contenitore nuovo, che sostituisce quello visibile
+ * solo se nel frattempo non è partita un'altra navigazione (evita sovrapposizioni).
+ */
+export async function route() {
+  const my = ++navToken;
+  if (cleanup) { try { cleanup(); } catch { /* */ } cleanup = null; }
+  const view = $('#view');
+  const hash = location.hash || '#/partite';
+  const { team, season } = await loadCurrent();
+  if (my !== navToken) return;
+  document.body.classList.toggle('live-mode', /\/live$/.test(hash));
+
+  const run = async (fn, args, tab) => {
+    const box = document.createElement('div');
+    let clean = null;
+    try {
+      clean = (await fn(box, ...args)) || null;
+    } catch (e) {
+      console.error(e);
+      box.innerHTML = `<div class="card"><p>Si è verificato un errore: ${esc(e.message)}</p></div>`;
+    }
+    if (my !== navToken) { if (clean) try { clean(); } catch { /* */ } return; }
+    setTab(tab);
+    view.replaceChildren(box);
+    window.scrollTo(0, 0);
+    cleanup = clean;
+  };
+
+  if ((!team || !season) && !/^#\/squadra\//.test(hash)) {
+    setHeader({ title: 'Benvenuto' });
+    $('#ctx').innerHTML = '';
+    await run(onboardingView, [team], null);
+    return;
+  }
+  await renderContext();
+  if (my !== navToken) return;
+  for (const [re, fn, tab] of routes) {
+    const m = hash.match(re);
+    if (m) {
+      await run(fn, m.slice(1).map(decodeURIComponent), tab);
+      return;
+    }
+  }
+  location.replace('#/partite');
+}
+
+function setTab(tab) {
+  document.querySelectorAll('.tabbar a').forEach((a) => a.classList.toggle('active', a.dataset.tab === tab));
+}
+
+// ---------- Avvio ----------
+
+window.addEventListener('hashchange', route);
+window.addEventListener('DOMContentLoaded', async () => {
+  route();
+  db.requestPersistence();
+  if ('serviceWorker' in navigator) {
+    try {
+      const reg = await navigator.serviceWorker.register('./sw.js');
+      reg.addEventListener('updatefound', () => {
+        const nw = reg.installing;
+        nw && nw.addEventListener('statechange', () => {
+          if (nw.state === 'installed' && navigator.serviceWorker.controller) toast('Nuova versione disponibile: chiudi e riapri l\'app.', 5000);
+        });
+      });
+    } catch (e) { console.warn('Service worker non registrato', e); }
+  }
+});

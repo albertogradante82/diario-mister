@@ -1,7 +1,14 @@
 // Archivio locale su IndexedDB. Nessun dato lascia il dispositivo.
 const DB_NAME = 'mister-db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 export const STORES = ['teams', 'seasons', 'players', 'matches', 'events', 'tracking', 'meta'];
+/** Archivi sincronizzati con l'archivio condiviso online. */
+export const SYNC_STORES = ['teams', 'seasons', 'players', 'matches', 'events', 'tracking'];
+
+// Avvisa il modulo di sincronizzazione quando ci sono modifiche locali da inviare.
+let changeListener = null;
+export function onLocalChange(fn) { changeListener = fn; }
+function notify() { if (changeListener) try { changeListener(); } catch { /* */ } }
 
 let dbPromise;
 
@@ -23,6 +30,7 @@ function open() {
       make('events', ['matchId']);
       make('tracking', ['matchId', 'playerId']);
       make('meta');
+      make('outbox'); // modifiche locali in attesa di invio all'archivio condiviso
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -56,31 +64,119 @@ export async function where(name, index, value) {
   return wrap((await store(name)).index(index).getAll(value));
 }
 
+const tracked = (name) => SYNC_STORES.includes(name);
+
+function done(tx, value) {
+  return new Promise((res, rej) => { tx.oncomplete = () => res(value); tx.onerror = () => rej(tx.error); tx.onabort = () => rej(tx.error); });
+}
+
 export async function put(name, obj) {
-  if (!obj.id) obj.id = uid();
-  obj.updatedAt = Date.now();
-  await wrap((await store(name, 'readwrite')).put(obj));
-  return obj;
+  return (await putMany(name, [obj]))[0];
 }
 
 export async function putMany(name, list) {
+  if (!list.length) return list;
   const db = await open();
-  const tx = db.transaction(name, 'readwrite');
+  const names = tracked(name) ? [name, 'outbox'] : [name];
+  const tx = db.transaction(names, 'readwrite');
   const s = tx.objectStore(name);
-  list.forEach((o) => { if (!o.id) o.id = uid(); s.put(o); });
-  return new Promise((res, rej) => { tx.oncomplete = () => res(list); tx.onerror = () => rej(tx.error); });
+  const now = Date.now();
+  list.forEach((o) => {
+    if (!o.id) o.id = uid();
+    o.updatedAt = now;
+    s.put(o);
+    if (tracked(name)) tx.objectStore('outbox').put({ id: `${name}:${o.id}`, store: name, recId: o.id, op: 'put', at: now });
+  });
+  await done(tx, list);
+  if (tracked(name)) notify();
+  return list;
 }
 
 export async function del(name, id) {
-  return wrap((await store(name, 'readwrite')).delete(id));
+  return delMany(name, [id]);
 }
 
 export async function delMany(name, ids) {
   if (!ids.length) return;
   const db = await open();
-  const tx = db.transaction(name, 'readwrite');
-  ids.forEach((id) => tx.objectStore(name).delete(id));
-  return new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = () => rej(tx.error); });
+  const names = tracked(name) ? [name, 'outbox'] : [name];
+  const tx = db.transaction(names, 'readwrite');
+  const now = Date.now();
+  ids.forEach((id) => {
+    tx.objectStore(name).delete(id);
+    if (tracked(name)) tx.objectStore('outbox').put({ id: `${name}:${id}`, store: name, recId: id, op: 'del', at: now });
+  });
+  await done(tx);
+  if (tracked(name)) notify();
+}
+
+// ---------- Supporto alla sincronizzazione ----------
+
+export async function outbox() {
+  return all('outbox');
+}
+
+/** Rimuove dalla coda le voci inviate (solo se non sono cambiate nel frattempo). */
+export async function clearOutbox(entries) {
+  const db = await open();
+  const tx = db.transaction('outbox', 'readwrite');
+  const os = tx.objectStore('outbox');
+  entries.forEach((e) => {
+    const r = os.get(e.id);
+    r.onsuccess = () => { if (r.result && r.result.at === e.at) os.delete(e.id); };
+  });
+  return done(tx);
+}
+
+/** Applica record arrivati dall'archivio condiviso, senza rimetterli in coda. */
+export async function applyRemote(items) {
+  if (!items.length) return 0;
+  const db = await open();
+  const tx = db.transaction([...SYNC_STORES, 'outbox'], 'readwrite');
+  const ob = tx.objectStore('outbox');
+  let changed = 0;
+  items.forEach(({ store: name, record }) => {
+    if (!SYNC_STORES.includes(name)) return;
+    const pending = ob.get(`${name}:${record.id}`);
+    pending.onsuccess = () => {
+      // una modifica locale più recente non ancora inviata vince
+      if (pending.result && pending.result.at > (record.updatedAt || 0)) return;
+      const os = tx.objectStore(name);
+      const local = os.get(record.id);
+      local.onsuccess = () => {
+        const cur = local.result;
+        if (record._deleted) {
+          if (cur) { os.delete(record.id); changed++; }
+        } else if (!cur || cur.updatedAt !== record.updatedAt) {
+          // eslint-disable-next-line no-unused-vars
+          const { serverSeq, ...rec } = record;
+          os.put(rec);
+          changed++;
+        }
+      };
+    };
+  });
+  await done(tx);
+  return changed;
+}
+
+/** Mette in coda tutti i dati locali (primo caricamento nell'archivio condiviso). */
+export async function queueAll() {
+  const db = await open();
+  const now = Date.now();
+  let n = 0;
+  for (const name of SYNC_STORES) {
+    const list = await all(name);
+    const tx = db.transaction('outbox', 'readwrite');
+    list.forEach((o) => { tx.objectStore('outbox').put({ id: `${name}:${o.id}`, store: name, recId: o.id, op: 'put', at: now }); n++; });
+    await done(tx);
+  }
+  notify();
+  return n;
+}
+
+export async function getRaw(name, id) {
+  return get(name, id);
 }
 
 export async function getMeta(key, fallback = null) {
@@ -106,14 +202,18 @@ export async function exportAll() {
 
 export async function importAll(backup) {
   if (!backup || backup.app !== 'mister-app' || !backup.data) throw new Error('File di backup non valido.');
+  // la configurazione dell'archivio condiviso resta quella di questo telefono
+  const syncCfg = await get('meta', 'sync');
   const db = await open();
-  const tx = db.transaction(STORES, 'readwrite');
+  const tx = db.transaction([...STORES, 'outbox'], 'readwrite');
   for (const s of STORES) {
     const os = tx.objectStore(s);
     os.clear();
-    (backup.data[s] || []).forEach((o) => os.put(o));
+    (backup.data[s] || []).forEach((o) => { if (!(s === 'meta' && o.id === 'sync')) os.put(o); });
   }
-  return new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = () => rej(tx.error); });
+  if (syncCfg) tx.objectStore('meta').put({ ...syncCfg, value: { ...syncCfg.value, cursor: 0 } });
+  tx.objectStore('outbox').clear();
+  return done(tx);
 }
 
 /** Elimina una partita con eventi e tracking collegati. */

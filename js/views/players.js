@@ -25,7 +25,7 @@ export async function rosterView(root) {
         const t = seasonTotals(rows, p.id);
         return `<a class="item" href="#/giocatore/${p.id}">${avatar(p)}
           <div class="grow"><strong>${esc(fullName(p))}</strong>
-          <div class="muted small">#${esc(p.number ?? '–')} · ${t.presenze} pres. · ${Math.round(t.minuti)}′ · ${t.gol} gol</div></div><span class="chev">›</span></a>`;
+          <div class="muted small">${p.number === '' || p.number == null ? '' : '#' + esc(p.number) + ' · '}${t.presenze} pres. · ${Math.round(t.minuti)}′ · ${t.gol} gol</div></div><span class="chev">›</span></a>`;
       }).join('')}</div>`).join('')}`;
 }
 
@@ -53,7 +53,7 @@ export async function playerView(root, id) {
   const hasTracking = tot.distanza != null;
 
   const info = [
-    ['Ruolo', p.role], ['Piede', p.foot], ['Nato il', p.birthDate ? `${fmtDate(p.birthDate)} (${age(p.birthDate)} anni)` : ''],
+    ['Ruolo', p.role], ['Posizione', p.position], ['Piede', p.foot], ['Nato il', p.birthDate ? `${fmtDate(p.birthDate)} (${age(p.birthDate)} anni)` : ''],
     ['Luogo di nascita', p.birthPlace], ['Altezza', p.height ? `${p.height} cm` : ''], ['Peso', p.weight ? `${p.weight} kg` : ''],
     ['Contatto', p.contact], ['Visita medica', p.medicalExpiry ? `scade il ${fmtDate(p.medicalExpiry)}` : ''],
     ...(team?.customFields || []).map((c) => [c.name, (p.custom || {})[c.id]]),
@@ -64,7 +64,7 @@ export async function playerView(root, id) {
   root.innerHTML = `
     <div class="profile">
       ${avatar(p, 84)}
-      <div><div class="big-num">#${esc(p.number ?? '–')}</div><div class="muted">${esc(p.role || '')}${p.foot ? ' · piede ' + esc(p.foot.toLowerCase()) : ''}</div></div>
+      <div><div class="big-num">${p.number === '' || p.number == null ? '<span class="muted small">nessun numero</span>' : '#' + esc(p.number)}</div><div class="muted">${esc(p.role || '')}${p.foot ? ' · piede ' + esc(p.foot.toLowerCase()) : ''}</div></div>
     </div>
 
     <div class="tiles">

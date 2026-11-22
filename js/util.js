@@ -51,7 +51,7 @@ export function sheet(title, build) {
 
 export function confirmDialog(message, okLabel = 'Conferma', danger = false) {
   return sheet('Conferma', (body, close) => {
-    body.innerHTML = `<p class="mb">${esc(message)}</p>
+    body.innerHTML = `<p class="mb" style="white-space:pre-line">${esc(message)}</p>
       <div class="row gap"><button class="btn grow" data-no>Annulla</button>
       <button class="btn grow ${danger ? 'danger' : 'primary'}" data-yes>${esc(okLabel)}</button></div>`;
     body.querySelector('[data-no]').onclick = () => close(false);

@@ -1,4 +1,5 @@
 import * as db from './db.js';
+import * as sync from './sync.js';
 import { esc, $, toast, pick } from './util.js';
 import { matchesView, matchEditView, matchView, liveView } from './views/matches.js';
 import { rosterView, playerView, playerEditView } from './views/players.js';
@@ -159,8 +160,32 @@ function setTab(tab) {
 // ---------- Avvio ----------
 
 window.addEventListener('hashchange', route);
+function syncIndicator(st) {
+  const el = $('#sync-ind');
+  if (!el) return;
+  el.hidden = st.state === 'off';
+  const map = {
+    ok: ['☁︎', 'Sincronizzato', 'ok'],
+    syncing: ['↻', 'Sincronizzazione…', 'busy'],
+    offline: ['☁︎', 'Offline: le modifiche verranno inviate appena torna la rete', 'off'],
+    error: ['!', 'Errore di sincronizzazione', 'err'],
+  };
+  const [icon, title, cls] = map[st.state] || map.ok;
+  el.className = `sync-ind ${cls}`;
+  el.textContent = st.pending && st.state !== 'syncing' ? `${icon} ${st.pending}` : icon;
+  el.title = st.error ? `${title}: ${st.error}` : title;
+}
+
 window.addEventListener('DOMContentLoaded', async () => {
+  sync.onStatus(syncIndicator);
+  sync.onRemoteData(() => {
+    // aggiorna la schermata con i dati degli altri mister, ma non durante modifica o live
+    if (/\/(modifica|nuovo|nuova|live)$/.test(location.hash) || document.querySelector('.sheet-back')) return;
+    route();
+    toast('Dati aggiornati dall\'archivio condiviso');
+  });
   route();
+  sync.start();
   db.requestPersistence();
   if ('serviceWorker' in navigator) {
     try {

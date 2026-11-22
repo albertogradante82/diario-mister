@@ -1,6 +1,6 @@
 // Service worker: rende l'app utilizzabile offline.
 // Ad ogni rilascio aumenta VERSION per far scaricare i file aggiornati.
-const VERSION = 'mister-v1.0.0';
+const VERSION = 'mister-v1.2.0';
 const ASSETS = [
   './',
   './index.html',
@@ -13,6 +13,7 @@ const ASSETS = [
   './js/charts.js',
   './js/tracking.js',
   './js/pdf.js',
+  './js/sync.js',
   './js/views/matches.js',
   './js/views/players.js',
   './js/views/analysis.js',
@@ -39,7 +40,9 @@ self.addEventListener('activate', (e) => {
 // Cache-first per i file dell'app (funziona senza rete), aggiornamento in background.
 self.addEventListener('fetch', (e) => {
   const req = e.request;
-  if (req.method !== 'GET' || new URL(req.url).origin !== location.origin) return;
+  const url = new URL(req.url);
+  // l'archivio condiviso va sempre letto dalla rete
+  if (req.method !== 'GET' || url.origin !== location.origin || url.pathname.includes('/api/')) return;
   e.respondWith(
     caches.match(req, { ignoreSearch: true }).then((cached) => {
       const network = fetch(req).then((res) => {

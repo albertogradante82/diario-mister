@@ -3,6 +3,7 @@ import { setHeader, loadSeason } from '../app.js';
 import { seasonData, seasonTotals, per90, playerSeries, METRICS, detectTrends, detectTeamTrends } from '../stats.js';
 import { lineChart, barChart, hBars, PALETTE } from '../charts.js';
 import { standingsCard } from './home.js';
+import { fillPhotos } from '../profiles.js';
 
 const TABS = [['andamento', 'Andamento'], ['ruoli', 'Ruoli'], ['per90', 'Per 90′'], ['tempi', 'Tempi'], ['tendenze', 'Tendenze']];
 const PERIOD_NAMES = ['1° tempo', '2° tempo', '3° tempo'];
@@ -40,6 +41,7 @@ export async function analysisView(root) {
   function draw() {
     if (tab !== 'campionato' && !rows.length) { pane.innerHTML = '<div class="empty"><p>Nessuna partita registrata per questa analisi.</p></div>'; return; }
     ({ campionato, andamento, ruoli, per90: per90Tab, tempi, tendenze })[tab]();
+    fillPhotos(pane);
   }
 
   // ---- Campionato (dati ufficiali Tuttocampo) ----
@@ -53,8 +55,8 @@ export async function analysisView(root) {
         groups: played.map((r) => shortDate(r.match.date)),
         series: [{ name: 'Fatti', values: played.map((r) => r.score.fatti), color: PALETTE[2] }, { name: 'Subiti', values: played.map((r) => r.score.subiti), color: PALETTE[6] }],
       })}</div>` : ''}
-      ${scorers.length ? `<h2 class="section">Marcatori</h2><div class="card">${hBars(scorers.map((m) => ({ label: pname(m), value: m.gol, display: `${m.gol}${m.rigori ? ` (${m.rigori} rig.)` : ''}` })), { color: PALETTE[2] })}</div>` : ''}
-      ${assists.length ? `<h2 class="section">Assist</h2><div class="card">${hBars(assists.map((m) => ({ label: pname(m), value: m.assist, display: String(m.assist) })))}</div>` : ''}`;
+      ${scorers.length ? `<h2 class="section">Marcatori</h2><div class="card">${hBars(scorers.map((m) => ({ label: pname(m), photoId: m.playerId, value: m.gol, display: `${m.gol}${m.rigori ? ` (${m.rigori} rig.)` : ''}` })), { color: PALETTE[2] })}</div>` : ''}
+      ${assists.length ? `<h2 class="section">Assist</h2><div class="card">${hBars(assists.map((m) => ({ label: pname(m), photoId: m.playerId, value: m.assist, display: String(m.assist) })))}</div>` : ''}`;
   }
 
   // ---- Andamento: un grafico per giocatori selezionati ----

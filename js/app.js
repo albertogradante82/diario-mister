@@ -1,5 +1,6 @@
 import * as db from './db.js';
 import * as sync from './sync.js';
+import { fillPhotos } from './profiles.js';
 import { esc, $, toast, pick } from './util.js';
 import { matchesView, matchEditView, matchView, liveView } from './views/matches.js';
 import { rosterView, playerView, playerEditView } from './views/players.js';
@@ -164,6 +165,7 @@ export async function route() {
     if (my !== navToken) { if (clean) try { clean(); } catch { /* */ } return; }
     setTab(tab);
     view.replaceChildren(box);
+    fillPhotos(box).catch(() => {});
     window.scrollTo(0, 0);
     cleanup = clean;
   };
@@ -220,7 +222,7 @@ function setTab(tab) {
 
 // ---------- Avvio ----------
 
-export const APP_VERSION = '1.11.2';
+export const APP_VERSION = '1.11.3';
 let swReg = null;
 
 /** Controlla subito se c'è una versione nuova dell'app; restituisce true se è stata trovata. */

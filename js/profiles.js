@@ -50,3 +50,23 @@ export async function serviceActive() {
 export async function myPrivate(id, pin) {
   return (await call(`${API}?action=mine`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, pin }) })).priv || {};
 }
+
+/**
+ * Sostituisce con la foto inviata dal ragazzo ogni elemento [data-rphoto="<id>"]
+ * che non ha già un'immagine (es. avatar con le iniziali).
+ */
+export async function fillPhotos(root) {
+  const els = [...root.querySelectorAll('[data-rphoto]')].filter((el) => !el.querySelector('img') && el.tagName !== 'IMG');
+  if (!els.length) return;
+  const profs = await listProfiles();
+  els.forEach(async (el) => {
+    const id = el.dataset.rphoto;
+    if (!profs[id]?.hasPhoto) return;
+    const ph = await getPhoto(id);
+    if (!ph || !el.isConnected && !root.contains(el)) return;
+    const size = el.style.width || el.offsetWidth + 'px';
+    el.innerHTML = `<img src="${ph}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+    el.style.padding = '0'; el.style.overflow = 'hidden';
+    if (size && size !== '0px') { el.style.width = size; el.style.height = size; }
+  });
+}

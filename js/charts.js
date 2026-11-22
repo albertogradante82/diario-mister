@@ -95,7 +95,7 @@ export function hBars(items, { color = PALETTE[0], percent = false } = {}) {
   if (!vals.length) return `<div class="chart-empty">Nessun dato</div>`;
   const max = percent ? 1 : Math.max(...vals) || 1;
   return `<div class="hbars">${items.map((i) => `
-    <div class="hbar"><span class="hbar-label">${esc(i.label)}</span>
+    <div class="hbar"><span class="hbar-label">${i.photoId ? `<span class="avatar hbar-av" data-rphoto="${esc(i.photoId)}">${esc(String(i.label).split(' ').map((w) => w[0]).join('').slice(0, 2))}</span>` : ''}${esc(i.label)}</span>
       <span class="hbar-track"><span style="width:${i.value == null ? 0 : Math.max(2, (i.value / max) * 100)}%;background:${i.color || color}"></span></span>
       <span class="hbar-val">${esc(i.display ?? fmtTick(i.value ?? 0, percent))}</span></div>`).join('')}</div>`;
 }

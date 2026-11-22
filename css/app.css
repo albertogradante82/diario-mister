@@ -383,3 +383,7 @@ body.no-tabs { padding-bottom: var(--safe-b); }
 .table.standings tr.zona-promozione td:first-child { box-shadow: inset 4px 0 0 var(--ok); }
 .zona-dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; }
 .zona-dot.zona-playoff { background: #2a7de1; } .zona-dot.zona-promozione { background: var(--ok); }
+
+.hbar { grid-template-columns: 150px 1fr 56px; }
+.hbar-label { display: flex; align-items: center; gap: 6px; }
+.hbar-av { width: 26px !important; height: 26px !important; font-size: 10px; flex: none; }

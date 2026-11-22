@@ -1,6 +1,6 @@
 // Accesso giocatori/genitori: sola lettura, dati pubblici (dati/pubblico.json).
 import { esc, fmtDate, today, toast, resizeImage, age, $ } from '../util.js';
-import { listProfiles, getPhoto, saveProfile, myPrivate } from '../profiles.js';
+import { listProfiles, getPhoto, saveProfile, myPrivate, fillPhotos } from '../profiles.js';
 import { sheet } from '../util.js';
 import { exportPublicPlayerPdf } from '../pdf.js';
 import { setHeader } from '../app.js';
@@ -122,7 +122,7 @@ export async function playerScorersView(root) {
       const team = d.teams.find((t) => t.id === pick.sel);
       const st = team?.stats;
       // marcatori: dati ufficiali se presenti, altrimenti dai tabellini registrati
-      let scorers = (st?.marcatori || []).filter((m) => m.gol > 0).map((m) => ({ name: m.name, gol: m.gol, rig: m.rigori, ast: m.assist }));
+      let scorers = (st?.marcatori || []).filter((m) => m.gol > 0).map((m) => ({ id: m.playerId, name: m.name, gol: m.gol, rig: m.rigori, ast: m.assist }));
       if (!scorers.length) {
         const count = {};
         d.matches.filter((m) => m.teamId === pick.sel).forEach((m) => (m.scorers || []).forEach((n) => { if (n) count[n] = (count[n] || 0) + 1; }));
@@ -138,11 +138,12 @@ export async function playerScorersView(root) {
           </table></div>${st.legenda ? `<p class="small">${Object.entries(st.legenda).map(([k, v]) => `<span class="zona-dot zona-${k}"></span> ${esc(v)}`).join(' &nbsp; ')}</p>` : ''}` : ''}
         ${st?.evidenza?.length ? `<h2 class="section">In evidenza</h2><div class="list">${st.evidenza.map((t) => `<div class="item small">🔥 ${esc(t)}</div>`).join('')}</div>` : ''}
         <h2 class="section">Marcatori</h2>
-        ${scorers.length ? `<div class="list">${scorers.map((m, i) => `<div class="item"><span class="rank">${i + 1}</span><div class="grow">${esc(m.name)}</div><strong>${m.gol}</strong><span class="muted small">gol${m.rig ? ` (${m.rig} rig.)` : ''}</span></div>`).join('')}</div>`
+        ${scorers.length ? `<div class="list">${scorers.map((m, i) => `<div class="item"><span class="rank">${i + 1}</span>${m.id || m.playerId ? `<span class="avatar" style="width:38px;height:38px;font-size:14px" data-rphoto="${m.id || m.playerId}">${esc(m.name.split(' ').map((w) => w[0]).join('').slice(0, 2))}</span>` : ''}<div class="grow">${esc(m.name)}</div><strong>${m.gol}</strong><span class="muted small">gol${m.rig ? ` (${m.rig} rig.)` : ''}</span></div>`).join('')}</div>`
           : '<div class="empty"><div class="empty-icon">⚽</div><p>Ancora nessun gol registrato per questa squadra.</p></div>'}
-        ${assists.length ? `<h2 class="section">Assist</h2><div class="list">${assists.map((m, i) => `<div class="item"><span class="rank">${i + 1}</span><div class="grow">${esc(m.name)}</div><strong>${m.assist}</strong><span class="muted small">assist</span></div>`).join('')}</div>` : ''}
+        ${assists.length ? `<h2 class="section">Assist</h2><div class="list">${assists.map((m, i) => `<div class="item"><span class="rank">${i + 1}</span>${m.id || m.playerId ? `<span class="avatar" style="width:38px;height:38px;font-size:14px" data-rphoto="${m.id || m.playerId}">${esc(m.name.split(' ').map((w) => w[0]).join('').slice(0, 2))}</span>` : ''}<div class="grow">${esc(m.name)}</div><strong>${m.assist}</strong><span class="muted small">assist</span></div>`).join('')}</div>` : ''}
         ${st ? `<p class="small muted">Fonte: ${esc(st.fonte || 'Tuttocampo')}, aggiornata al ${esc(fmtDate(st.aggiornato))}.</p>` : ''}`;
       bindPicker(root, draw);
+      fillPhotos(root);
     };
     draw();
   });

@@ -11,6 +11,7 @@ export async function rosterView(root) {
   const ctx = await loadSeason();
   setHeader({ title: 'Rosa', actions: `<a class="hdr-btn" href="#/giocatore/nuovo" aria-label="Nuovo giocatore">＋</a>` });
   const rows = seasonData(ctx);
+  const tcBy = Object.fromEntries((ctx.team?.tcStats?.marcatori || []).filter((m) => m.playerId).map((m) => [m.playerId, m]));
   const groups = ROLES.map((r) => [r, ctx.players.filter((p) => p.role === r)]);
   const other = ctx.players.filter((p) => !ROLES.includes(p.role));
   if (other.length) groups.push(['Senza ruolo', other]);
@@ -25,7 +26,7 @@ export async function rosterView(root) {
         const t = seasonTotals(rows, p.id);
         return `<a class="item" href="#/giocatore/${p.id}">${avatar(p)}
           <div class="grow"><strong>${esc(fullName(p))}</strong>
-          <div class="muted small">${p.number === '' || p.number == null ? '' : '#' + esc(p.number) + ' · '}${t.presenze} pres. · ${Math.round(t.minuti)}′ · ${t.gol} gol</div></div><span class="chev">›</span></a>`;
+          <div class="muted small">${p.number === '' || p.number == null ? '' : '#' + esc(p.number) + ' · '}${t.presenze ? `${t.presenze} pres. · ${Math.round(t.minuti)}′ · ` : ''}${tcBy[p.id] ? `⚽ ${tcBy[p.id].gol} gol · ${tcBy[p.id].assist} assist` : t.gol ? `${t.gol} gol` : 'nessun gol'}</div></div><span class="chev">›</span></a>`;
       }).join('')}</div>`).join('')}`;
 }
 
@@ -52,6 +53,13 @@ export async function playerView(root, id) {
   const tcLines = (await db.all('teams')).flatMap((t) => (t.tcStats?.marcatori || []).filter((m) => m.playerId === p.id)
     .map((m) => ({ ...m, team: t.name, aggiornato: t.tcStats.aggiornato, own: t.id === p.teamId })))
     .sort((a, b) => b.own - a.own);
+  const sumTc = (ls) => ls.reduce((a, l) => ({ gol: a.gol + (l.gol || 0), assist: a.assist + (l.assist || 0), rigori: a.rigori + (l.rigori || 0) }), { gol: 0, assist: 0, rigori: 0 });
+  const tcTot = tcLines.length ? sumTc(tcLines) : null;
+  const tcOwn = sumTc(tcLines.filter((l) => l.own));
+  const usRow = (team?.tcStats?.classifica || []).find((r) => /palazzo/i.test(r.squadra));
+  const finished = rows.filter((r) => r.match.status === 'finita');
+  const teamGF = usRow?.gf ?? (finished.length ? finished.reduce((a, r) => a + r.score.fatti, 0) : 0);
+  const teamRec = usRow ? `${usRow.v}-${usRow.n}-${usRow.p}` : '';
   const heat = mergeHeatmaps(played.flatMap((r) => r.tracking.filter((t) => t.playerId === p.id).map((t) => t.heatmap)));
   const pitch = played.flatMap((r) => r.tracking.filter((t) => t.playerId === p.id).map((t) => t.pitch)).find(Boolean);
   const hasTracking = tot.distanza != null;
@@ -71,14 +79,22 @@ export async function playerView(root, id) {
       <div><div class="big-num">${p.number === '' || p.number == null ? '<span class="muted small">nessun numero</span>' : '#' + esc(p.number)}</div><div class="muted">${esc(p.role || '')}${p.foot ? ' · piede ' + esc(p.foot.toLowerCase()) : ''}</div></div>
     </div>
 
+    ${tcTot ? `<h2 class="section">Statistiche ufficiali · Tuttocampo</h2>
+    <div class="tiles">
+      ${tile('Gol', tcTot.gol)}${tile('Assist', tcTot.assist)}${tile('Gol + assist', tcTot.gol + tcTot.assist)}
+      ${tile('Rigori segnati', tcTot.rigori)}${teamGF ? tile('% gol squadra', Math.round((tcOwn.gol / teamGF) * 100) + '%') : ''}${teamRec ? tile('Squadra V-N-P', teamRec) : ''}
+    </div>
+    ${tcLines.length > 1 ? `<div class="card small">${tcLines.map((l) => `<div>${esc(l.team)}: <strong>${l.gol}</strong> gol${l.rigori ? ` (${l.rigori} rig.)` : ''}, <strong>${l.assist}</strong> assist</div>`).join('')}</div>` : ''}
+    <p class="small muted">Aggiornate al ${esc(fmtDate(tcLines[0]?.aggiornato || team?.tcStats?.aggiornato))}. ${team?.tcStats?.posizione ? '' : ''}</p>` : team?.tcStats ? `<div class="card small">📊 Nessun gol o assist ufficiale in stagione (Tuttocampo, al ${esc(fmtDate(team.tcStats.aggiornato))}).</div>` : ''}
+
+    ${tot.presenze ? `<h2 class="section">Statistiche registrate dal mister</h2>
     <div class="tiles">
       ${tile('Presenze', tot.presenze)}${tile('Titolare', tot.titolare)}${tile('Minuti', Math.round(tot.minuti))}
       ${tile('Gol', tot.gol)}${tile('Assist', tot.assist)}${tile('Tiri (porta)', `${tot.tiri} (${tot.tiriPorta})`)}
       ${tile('Passaggi', `${tot.passaggiOk}/${tot.passaggi}`)}${tile('Precisione', pct(tot.precisione))}${tile('Recuperi', tot.recuperi)}
       ${tile('Palle perse', tot.perse)}${hasTracking ? tile('Km totali', num(tot.distanza / 1000, 1)) + tile('Vel. max', num(tot.velMax, 1)) : ''}
-    </div>
+    </div>` : `<div class="card small">⏱️ <strong>Presenze, minuti, tiri, passaggi e recuperi</strong> compaiono qui quando registri le partite con <strong>▶ Avvia live</strong> (o inserisci formazione ed eventi a fine partita). Tuttocampo non pubblica questi dati per i singoli giocatori.</div>`}
 
-    ${tcLines.length ? `<div class="card small">📊 <strong>Tuttocampo</strong> (al ${esc(fmtDate(tcLines[0].aggiornato))})${tcLines.map((l) => `<div class="mt">${esc(l.team)}: <strong>${l.gol}</strong> gol${l.rigori ? ` (${l.rigori} su rigore)` : ''}, <strong>${l.assist}</strong> assist</div>`).join('')}</div>` : ''}
 
     ${trends.length ? `<h2 class="section">Tendenze ultime 3 partite</h2><div class="list">${trends.map((t) => `<div class="item"><span class="trend ${t.better ? 'up' : 'down'}">${t.better ? '▲' : '▼'}</span><div class="grow">${esc(t.label)}<div class="muted small">${esc(t.text)}</div></div></div>`).join('')}</div>` : ''}
 

@@ -124,6 +124,7 @@ export async function playerScorersView(root) {
             <thead><tr><th>#</th><th>Squadra</th><th>PT</th><th>G</th><th>V</th><th>N</th><th>P</th><th>DR</th></tr></thead>
             <tbody>${st.classifica.map((r) => `<tr class="${/palazzo/i.test(r.squadra) ? 'us' : ''}"><td>${r.pos}</td><td>${esc(r.squadra)}</td><td><b>${r.pt}</b></td><td>${r.g}</td><td>${r.v}</td><td>${r.n}</td><td>${r.p}</td><td>${r.dr > 0 ? '+' : ''}${r.dr}</td></tr>`).join('')}</tbody>
           </table></div>` : ''}
+        ${st?.evidenza?.length ? `<h2 class="section">In evidenza</h2><div class="list">${st.evidenza.map((t) => `<div class="item small">🔥 ${esc(t)}</div>`).join('')}</div>` : ''}
         <h2 class="section">Marcatori</h2>
         ${scorers.length ? `<div class="list">${scorers.map((m, i) => `<div class="item"><span class="rank">${i + 1}</span><div class="grow">${esc(m.name)}</div><strong>${m.gol}</strong><span class="muted small">gol${m.rig ? ` (${m.rig} rig.)` : ''}</span></div>`).join('')}</div>`
           : '<div class="empty"><div class="empty-icon">⚽</div><p>Ancora nessun gol registrato per questa squadra.</p></div>'}

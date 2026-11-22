@@ -124,5 +124,11 @@ export function standingsCard(tc) {
       <thead><tr><th>#</th><th>Squadra</th><th>PT</th><th>G</th><th>V</th><th>N</th><th>P</th><th>DR</th></tr></thead>
       <tbody>${rows.map((r) => `<tr class="${/palazzo/i.test(r.squadra) ? 'us' : ''}"><td>${r.pos}</td><td>${esc(r.squadra)}</td><td><b>${r.pt}</b></td><td>${r.g}</td><td>${r.v}</td><td>${r.n}</td><td>${r.p}</td><td>${r.dr > 0 ? '+' : ''}${r.dr}</td></tr>`).join('')}</tbody>
     </table></div>
-    <p class="small muted">Fonte: ${esc(tc.fonte || 'Tuttocampo')}, aggiornata al ${esc(fmtDate(tc.aggiornato))}${tc.classificaCompleta === false ? ' · classifica parziale' : ''}.</p>`;
+    <p class="small muted">Fonte: ${esc(tc.fonte || 'Tuttocampo')}, aggiornata al ${esc(fmtDate(tc.aggiornato))}${tc.classificaCompleta === false ? ' · classifica parziale' : ''}.</p>
+    ${evidenzaCard(tc)}`;
+}
+
+export function evidenzaCard(tc) {
+  if (!tc || !tc.evidenza || !tc.evidenza.length) return '';
+  return `<h2 class="section">In evidenza</h2><div class="list">${tc.evidenza.map((t) => `<div class="item small">🔥 ${esc(t)}</div>`).join('')}</div>`;
 }

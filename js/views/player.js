@@ -289,3 +289,13 @@ export async function playerProfileEditView(root, id) {
     };
   });
 }
+
+// ---------- Menu "Altro" dell'area giocatori ----------
+export async function playerMoreView(root) {
+  setHeader({ title: 'Altro' });
+  root.innerHTML = `<div class="list">
+    <a class="item" href="#/g/rose"><span style="font-size:24px">👥</span><div class="grow"><strong>Squadre e schede giocatori</strong><div class="muted small">Rose con foto · compila la tua scheda</div></div><span class="chev">›</span></a>
+    <a class="item" href="#/g/marcatori"><span style="font-size:24px">🏆</span><div class="grow"><strong>Classifiche e marcatori</strong><div class="muted small">Campionati e classifica di tutte le giovanili</div></div><span class="chev">›</span></a>
+    <a class="item" href="#/g/esci"><span style="font-size:24px">🚪</span><div class="grow"><strong>Esci</strong><div class="muted small">Torna alla scelta dell'accesso</div></div><span class="chev">›</span></a>
+  </div>`;
+}

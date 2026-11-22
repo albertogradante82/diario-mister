@@ -422,3 +422,22 @@ body.no-tabs { padding-bottom: var(--safe-b); }
 .conv-count { display: flex; gap: 14px; font-weight: 700; font-size: 15px; }
 .ok { color: var(--ok); } .ko { color: var(--ko); }
 .conv-yes.primary { background: var(--ok); color: #fff; }
+
+/* Presenze allenamenti P/A */
+.pa-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pa-btn { border: 3px solid var(--line); background: var(--card); border-radius: 16px; padding: 10px; font: inherit; font-size: 34px; font-weight: 900; display: flex; flex-direction: column; align-items: center; cursor: pointer; color: var(--text); }
+.pa-btn small { font-size: 12px; font-weight: 600; color: var(--muted); }
+.pa-p { color: var(--ok); } .pa-a { color: var(--ko); }
+.pa-p.on { background: var(--ok); border-color: var(--ok); color: #fff; } .pa-a.on { background: var(--ko); border-color: var(--ko); color: #fff; }
+.pa-btn.on small { color: #fff; }
+.pres-bar { height: 6px; background: var(--bg); border-radius: 3px; margin-top: 5px; overflow: hidden; }
+.pres-bar span { display: block; height: 100%; background: var(--ok); }
+/* Risposte in bacheca */
+.replies { margin-top: 8px; display: flex; flex-direction: column; gap: 8px; }
+.reply { display: flex; gap: 8px; background: var(--bg); border-radius: 12px; padding: 8px 10px; }
+.reply-mister { background: var(--accent-soft); }
+.reply-head { font-size: 13px; display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
+.reply-text { font-size: 14px; white-space: pre-wrap; }
+.reply-form { display: flex; gap: 6px; margin-top: 10px; }
+.reply-form input { flex: 1; }
+.chip-dot { background: var(--ko); color: #fff; border-radius: 8px; padding: 0 5px; font-size: 11px; font-weight: 800; }

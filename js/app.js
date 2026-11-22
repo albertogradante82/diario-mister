@@ -8,8 +8,8 @@ import { analysisView } from './views/analysis.js';
 import { calendarView } from './views/calendar.js';
 import { homeView } from './views/home.js';
 import { playerBoardView, misterBoardView, updateBadge } from './views/board.js';
-import { misterConvView } from './views/convocazioni.js';
-import { playerCalendarView, playerRosterView, playerScorersView, playerProfileView, playerProfileEditView } from './views/player.js';
+import { misterConvView, playerConvView } from './views/convocazioni.js';
+import { playerCalendarView, playerRosterView, playerScorersView, playerProfileView, playerProfileEditView, playerMoreView } from './views/player.js';
 import { roleChoiceView, autoUpdateClubData } from './views/more.js';
 import { getRole, logout } from './roles.js';
 import { confirmDialog } from './util.js';
@@ -101,7 +101,8 @@ const routes = [
   [/^#\/partite$/, matchesView, 'partite'],
   [/^#\/calendario$/, calendarView, 'partite'],
   [/^#\/bacheca$/, misterBoardView, 'home'],
-  [/^#\/convocazioni$/, misterConvView, 'home'],
+  [/^#\/convocazioni$/, misterConvView('partita'), 'home'],
+  [/^#\/allenamenti$/, misterConvView('allenamento'), 'home'],
   [/^#\/partita\/nuova$/, (r) => matchEditView(r, null), 'partite'],
   [/^#\/partita\/([^/]+)\/modifica$/, (r, id) => matchEditView(r, id), 'partite'],
   [/^#\/partita\/([^/]+)\/live$/, liveView, 'partite'],
@@ -122,16 +123,19 @@ function getRoleSync() {
 
 const playerRoutes = [
   [/^#\/g\/bacheca$/, playerBoardView, 'g-bacheca'],
+  [/^#\/g\/convocazioni$/, playerConvView('partita'), 'g-conv'],
+  [/^#\/g\/allenamenti$/, playerConvView('allenamento'), 'g-all'],
+  [/^#\/g\/altro$/, playerMoreView, 'g-altro'],
   [/^#\/g\/calendario$/, playerCalendarView, 'g-cal'],
-  [/^#\/g\/rose$/, playerRosterView, 'g-rose'],
-  [/^#\/g\/marcatori$/, playerScorersView, 'g-marc'],
-  [/^#\/g\/giocatore\/([^/]+)\/modifica$/, playerProfileEditView, 'g-rose'],
-  [/^#\/g\/giocatore\/([^/]+)$/, playerProfileView, 'g-rose'],
+  [/^#\/g\/rose$/, playerRosterView, 'g-altro'],
+  [/^#\/g\/marcatori$/, playerScorersView, 'g-altro'],
+  [/^#\/g\/giocatore\/([^/]+)\/modifica$/, playerProfileEditView, 'g-altro'],
+  [/^#\/g\/giocatore\/([^/]+)$/, playerProfileView, 'g-altro'],
 ];
 
 const TABS = {
   mister: [['#/home', 'home', '🏠', 'Home'], ['#/partite', 'partite', '📅', 'Partite'], ['#/rosa', 'rosa', '👥', 'Rosa'], ['#/analisi', 'analisi', '📊', 'Analisi'], ['#/altro', 'altro', '⚙️', 'Altro']],
-  giocatore: [['#/g/bacheca', 'g-bacheca', '📣', 'Bacheca'], ['#/g/calendario', 'g-cal', '📅', 'Calendario'], ['#/g/rose', 'g-rose', '👥', 'Squadre'], ['#/g/marcatori', 'g-marc', '🏆', 'Classifica'], ['#/g/esci', 'g-esci', '🚪', 'Esci']],
+  giocatore: [['#/g/bacheca', 'g-bacheca', '📣', 'Bacheca'], ['#/g/convocazioni', 'g-conv', '⚽', 'Convocazioni'], ['#/g/allenamenti', 'g-all', '🏃', 'Allenamenti'], ['#/g/calendario', 'g-cal', '📅', 'Calendario'], ['#/g/altro', 'g-altro', '☰', 'Altro']],
 };
 let tabsFor = null;
 function renderTabbar(role) {
@@ -227,7 +231,7 @@ function setTab(tab) {
 
 // ---------- Avvio ----------
 
-export const APP_VERSION = '1.14.0';
+export const APP_VERSION = '1.15.0';
 let swReg = null;
 
 /** Controlla subito se c'è una versione nuova dell'app; restituisce true se è stata trovata. */

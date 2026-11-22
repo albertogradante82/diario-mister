@@ -113,7 +113,8 @@ export async function homeView(root) {
 
     <h2 class="section">Azioni rapide</h2>
     <div class="quick">
-      <a class="quick-btn" href="#/convocazioni"><span>📋</span>Convocazioni</a>
+      <a class="quick-btn" href="#/convocazioni"><span>⚽</span>Convocazioni partita</a>
+      <a class="quick-btn" href="#/allenamenti"><span>🏃</span>Presenze allenamenti</a>
       <a class="quick-btn" href="#/bacheca"><span>📣</span>Bacheca</a>
       <a class="quick-btn" href="#/partita/nuova"><span>➕</span>Nuova partita</a>
       <a class="quick-btn" href="#/giocatore/nuovo"><span>👤</span>Nuovo giocatore</a>
@@ -123,7 +124,7 @@ export async function homeView(root) {
     </div>`;
 
   const cn = root.querySelector('#convnext');
-  if (cn) cn.onclick = () => editConvocation(null, { code: null, match: next });
+  if (cn) cn.onclick = () => editConvocation(null, { code: null, match: next, kind: 'partita' });
   const ub = root.querySelector('#clubupd');
   if (ub) ub.onclick = loadClubData;
   root.querySelectorAll('[data-m]').forEach((b) => (b.onclick = async () => {

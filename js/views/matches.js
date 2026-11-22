@@ -262,7 +262,7 @@ export async function matchView(root, id) {
       <button class="btn danger block mt" data-action="delTracking">Elimina dati di tracking</button>` : ''}
     </section>`;
 
-  $('#convoca', root).onclick = () => editConvocation(null, { code: null, match: m });
+  $('#convoca', root).onclick = () => editConvocation(null, { code: null, match: m, kind: 'partita' });
   $$('#tabs button', root).forEach((b) => (b.onclick = () => {
     sessionStorage.setItem('matchTab', b.dataset.tab);
     $$('#tabs button', root).forEach((x) => x.classList.toggle('active', x === b));

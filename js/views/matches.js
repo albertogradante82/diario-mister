@@ -17,7 +17,7 @@ function scoreLabel(m, s) {
 }
 
 function matchTitle(m, team) {
-  const us = team ? team.name : 'Noi';
+  const us = 'Palazzo';
   return m.home === false ? `${m.opponent} – ${us}` : `${us} – ${m.opponent}`;
 }
 
@@ -484,7 +484,7 @@ export async function liveView(root, id) {
     const recent = events.filter((e) => e.period === m.livePeriod + 1).sort((a, b) => b.t - a.t).slice(0, 6);
     root.innerHTML = `
       <div class="live-top">
-        <div class="live-score"><span>${esc(m.home === false ? m.opponent : ctx.team?.name || 'Noi')}</span><b>${scoreLabel(m, s)}</b><span>${esc(m.home === false ? ctx.team?.name || 'Noi' : m.opponent)}</span></div>
+        <div class="live-score"><span>${esc(m.home === false ? m.opponent : 'Palazzo')}</span><b>${scoreLabel(m, s)}</b><span>${esc(m.home === false ? 'Palazzo' : m.opponent)}</span></div>
         <div class="live-clock-row">
           <button class="period-btn" data-action="period">${PERIOD_NAMES[m.livePeriod]} ▾</button>
           <span class="live-clock ${p.running ? 'running' : ''}" id="clk">${clock(now())}</span>

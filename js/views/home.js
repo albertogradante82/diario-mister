@@ -37,7 +37,7 @@ export async function homeView(root) {
     .sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || '')))
     .slice(0, 6);
 
-  const vsLabel = (m) => (m.home === false ? `${esc(m.opponent)} – Noi` : `Noi – ${esc(m.opponent)}`);
+  const vsLabel = (m) => (m.home === false ? `${esc(m.opponent)} – Palazzo` : `Palazzo – ${esc(m.opponent)}`);
   const daysTo = (d) => {
     const n = Math.round((new Date(d + 'T12:00:00') - new Date(td + 'T12:00:00')) / 864e5);
     return n === 0 ? 'oggi' : n === 1 ? 'domani' : `tra ${n} giorni`;

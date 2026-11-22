@@ -378,3 +378,8 @@ body.no-tabs { padding-bottom: var(--safe-b); }
 .roster-ok { position: absolute; top: 8px; right: 8px; background: var(--ok); color: #fff; font-weight: 800; font-size: 12px; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
 .roster-name { font-size: 13px; font-weight: 700; line-height: 1.2; }
 .roster-sub { font-size: 11.5px; color: var(--muted); margin-top: 3px; }
+
+.table.standings tr.zona-playoff td:first-child { box-shadow: inset 4px 0 0 #2a7de1; }
+.table.standings tr.zona-promozione td:first-child { box-shadow: inset 4px 0 0 var(--ok); }
+.zona-dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; }
+.zona-dot.zona-playoff { background: #2a7de1; } .zona-dot.zona-promozione { background: var(--ok); }

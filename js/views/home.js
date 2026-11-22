@@ -126,8 +126,9 @@ export function standingsCard(tc) {
   return `<h2 class="section">Classifica <span class="muted">· ${esc(tc.campionato || '')}</span></h2>
     <div class="table-wrap"><table class="table standings">
       <thead><tr><th>#</th><th>Squadra</th><th>PT</th><th>G</th><th>V</th><th>N</th><th>P</th><th>DR</th></tr></thead>
-      <tbody>${rows.map((r) => `<tr class="${/palazzo/i.test(r.squadra) ? 'us' : ''}"><td>${r.pos}</td><td>${esc(r.squadra)}</td><td><b>${r.pt}</b></td><td>${r.g}</td><td>${r.v}</td><td>${r.n}</td><td>${r.p}</td><td>${r.dr > 0 ? '+' : ''}${r.dr}</td></tr>`).join('')}</tbody>
+      <tbody>${rows.map((r) => `<tr class="${/palazzo/i.test(r.squadra) ? 'us' : ''} ${r.zona ? 'zona-' + r.zona : ''}"><td>${r.pos}</td><td>${esc(r.squadra)}</td><td><b>${r.pt}</b></td><td>${r.g}</td><td>${r.v}</td><td>${r.n}</td><td>${r.p}</td><td>${r.dr > 0 ? '+' : ''}${r.dr}</td></tr>`).join('')}</tbody>
     </table></div>
+    ${tc.legenda ? `<p class="small">${Object.entries(tc.legenda).map(([k, v]) => `<span class="zona-dot zona-${k}"></span> ${esc(v)}`).join(' &nbsp; ')}</p>` : ''}
     <p class="small muted">Fonte: ${esc(tc.fonte || 'Tuttocampo')}, aggiornata al ${esc(fmtDate(tc.aggiornato))}${tc.classificaCompleta === false ? ' · classifica parziale' : ''}.</p>
     ${evidenzaCard(tc)}`;
 }

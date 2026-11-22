@@ -1,6 +1,7 @@
 import * as db from '../db.js';
 import { chooseFileAsAdmin } from '../admin.js';
 import { unlockClubData } from '../clubdata.js';
+import { setRole, misterLogin, logout } from '../roles.js';
 import { esc, on, toast, confirmDialog, pick, shareOrDownload, chooseFile, readText, fullName, sheet, $ } from '../util.js';
 import { setHeader, setCurrent, route, loadSeason, state, byNumber, APP_VERSION, checkForUpdate } from '../app.js';
 import * as sync from '../sync.js';
@@ -11,6 +12,27 @@ export function defaultSeasonName() {
   const d = new Date();
   const y = d.getMonth() >= 6 ? d.getFullYear() : d.getFullYear() - 1;
   return `${y}/${String(y + 1).slice(2)}`;
+}
+
+// ---------- Scelta dell'accesso ----------
+
+export async function roleChoiceView(root) {
+  root.innerHTML = `
+    <div class="hero">
+      <img class="hero-logo" src="icons/logo-palazzo.png" alt="Calcio Palazzo">
+      <h1>Calcio Palazzo</h1>
+      <p class="muted">Diario del Mister · stagione ${esc(defaultSeasonName())}</p>
+    </div>
+    <p class="small muted center-text mb">Chi sei?</p>
+    <button class="choice choice-main" id="asPlayer"><span class="choice-icon">🏃</span><span><strong>Giocatore o genitore</strong><small>Calendario, risultati, rose e marcatori di tutte le squadre.</small></span></button>
+    <button class="choice" id="asMister"><span class="choice-icon">📋</span><span><strong>Mister / dirigente</strong><small>Gestione completa: partite live, statistiche, giocatori. Serve la password.</small></span></button>`;
+  $('#asPlayer', root).onclick = () => { setRole('giocatore'); location.hash = '#/g/calendario'; route(); };
+  $('#asMister', root).onclick = async () => {
+    const data = await misterLogin();
+    if (data === false) return;
+    if (data) await mergeRose(data);
+    else { location.hash = '#/home'; route(); }
+  };
 }
 
 // ---------- Primo avvio ----------
@@ -134,6 +156,7 @@ export async function moreView(root) {
       <p><strong>Installare su iPhone:</strong> apri il link in Safari → tasto Condividi → <em>Aggiungi alla schermata Home</em>. L'app funziona anche senza connessione.</p>
       <div class="row gap center mb"><span class="grow">Versione <strong>${APP_VERSION}</strong></span><button class="btn small" data-action="update">Controlla aggiornamenti</button></div>
       <p class="muted">Nessun dato inviato a server senza archivio condiviso · rispetta la privacy dei minori: raccogli il consenso dei genitori per foto e dati.</p>
+      <button class="btn block mt" data-action="logout">🚪 Esci (cambia accesso)</button>
       <button class="btn danger block mt" data-action="wipe">Cancella tutti i dati</button>
     </div>`;
 
@@ -148,6 +171,12 @@ export async function moreView(root) {
   on(root, 'import', restoreBackup);
   on(root, 'importRose', importRose);
   on(root, 'clubData', loadClubData);
+  on(root, 'logout', async () => {
+    if (!(await confirmDialog('Uscire dall\'accesso mister? I dati restano su questo telefono; per rientrare servirà la password.', 'Esci'))) return;
+    logout();
+    location.hash = '#/home';
+    route();
+  });
   on(root, 'merge', () => mergePlayers(players));
   on(root, 'fields', () => editCustomFields(team));
   on(root, 'wipe', async () => {

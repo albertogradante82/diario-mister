@@ -17,6 +17,13 @@ async function decrypt(pkg, code) {
   return JSON.parse(new TextDecoder().decode(plain));
 }
 
+/** Scarica e decifra i dati della società con un codice già noto (lancia un errore se errato). */
+export async function fetchClubData(code) {
+  const r = await fetch(URL_DATA, { cache: 'no-cache' });
+  if (!r.ok) throw new Error('Dati della società non disponibili');
+  return decrypt(await r.json(), code);
+}
+
 /** Chiede il codice, decifra e restituisce i dati della società (oppure null se annullato). */
 export async function unlockClubData() {
   let pkg;

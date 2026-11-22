@@ -6,6 +6,10 @@ import { rosterView, playerView, playerEditView } from './views/players.js';
 import { analysisView } from './views/analysis.js';
 import { calendarView } from './views/calendar.js';
 import { homeView } from './views/home.js';
+import { playerCalendarView, playerRosterView, playerScorersView } from './views/player.js';
+import { roleChoiceView } from './views/more.js';
+import { getRole, logout } from './roles.js';
+import { confirmDialog } from './util.js';
 import { moreView, teamEditView, onboardingView } from './views/more.js';
 
 // ---------- Stato globale (squadra e stagione selezionate) ----------
@@ -107,6 +111,29 @@ const routes = [
   [/^#\/squadra\/([^/]+)$/, (r, id) => teamEditView(r, id), 'altro'],
 ];
 
+function getRoleSync() {
+  try { return localStorage.getItem('mister-role'); } catch { return null; }
+}
+
+const playerRoutes = [
+  [/^#\/g\/calendario$/, playerCalendarView, 'g-cal'],
+  [/^#\/g\/rose$/, playerRosterView, 'g-rose'],
+  [/^#\/g\/marcatori$/, playerScorersView, 'g-marc'],
+];
+
+const TABS = {
+  mister: [['#/home', 'home', '🏠', 'Home'], ['#/partite', 'partite', '📅', 'Partite'], ['#/rosa', 'rosa', '👥', 'Rosa'], ['#/analisi', 'analisi', '📊', 'Analisi'], ['#/altro', 'altro', '⚙️', 'Altro']],
+  giocatore: [['#/g/calendario', 'g-cal', '📅', 'Calendario'], ['#/g/rose', 'g-rose', '👥', 'Squadre'], ['#/g/marcatori', 'g-marc', '⚽', 'Marcatori'], ['#/g/esci', 'g-esci', '🚪', 'Esci']],
+};
+let tabsFor = null;
+function renderTabbar(role) {
+  const nav = document.querySelector('.tabbar');
+  document.body.classList.toggle('no-tabs', !role);
+  if (!role || tabsFor === role) return;
+  tabsFor = role;
+  nav.innerHTML = TABS[role].map(([href, tab, icon, label]) => `<a href="${href}" data-tab="${tab}"><span>${icon}</span>${label}</a>`).join('');
+}
+
 let cleanup = null;
 let navToken = 0;
 
@@ -139,6 +166,31 @@ export async function route() {
     cleanup = clean;
   };
 
+  // ---- Scelta dell'accesso / area giocatori ----
+  const role = await getRole();
+  if (my !== navToken) return;
+  renderTabbar(role);
+  if (!role) {
+    setHeader({ title: 'Benvenuto' });
+    $('#ctx').innerHTML = '';
+    await run(roleChoiceView, [], null);
+    return;
+  }
+  if (role === 'giocatore') {
+    $('#ctx').innerHTML = '';
+    if (hash === '#/g/esci') {
+      if (await confirmDialog('Uscire dall\'area giocatori?', 'Esci')) logout();
+      location.replace(role && getRoleSync() === 'giocatore' ? '#/g/calendario' : '#/home');
+      route();
+      return;
+    }
+    for (const [re, fn, tab] of playerRoutes) {
+      if (re.test(hash)) { await run(fn, [], tab); return; }
+    }
+    location.replace('#/g/calendario');
+    return;
+  }
+
   // Nessuna squadra ancora: la Home mostra le scelte per iniziare; Altro e Calendario restano usabili
   if ((!team || !season) && !/^#\/(squadra\/|altro$|calendario$)/.test(hash)) {
     const tab = (hash.match(/^#\/(home|partite|rosa|analisi)/) || [])[1] || 'home';
@@ -165,7 +217,7 @@ function setTab(tab) {
 
 // ---------- Avvio ----------
 
-export const APP_VERSION = '1.6.0';
+export const APP_VERSION = '1.7.0';
 let swReg = null;
 
 /** Controlla subito se c'è una versione nuova dell'app; restituisce true se è stata trovata. */

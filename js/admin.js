@@ -8,10 +8,14 @@ const ADMIN_HASH = '4e2b675ce189f521819362d26a421185528c788a0f7a1293108df1c50d13
 const UNLOCK_MINUTES = 10;
 let unlockedUntil = 0;
 
-async function hash(code) {
+export async function hash(code) {
   const data = new TextEncoder().encode('mister-admin:' + code.trim());
   const buf = await crypto.subtle.digest('SHA-256', data);
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+export async function checkAdminCode(code) {
+  return (await hash(code)) === ADMIN_HASH;
 }
 
 /** Sblocca la modalità admin (es. dopo aver decifrato i dati della società con lo stesso codice). */

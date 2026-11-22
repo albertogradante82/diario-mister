@@ -360,3 +360,6 @@ a.tile { color: var(--text); display: block; }
 
 .choice-main { border: 2px solid var(--accent); }
 .choice-logo { width: 40px; height: auto; flex: none; }
+
+body.no-tabs .tabbar { display: none; }
+body.no-tabs { padding-bottom: var(--safe-b); }

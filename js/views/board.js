@@ -1,6 +1,7 @@
 // Bacheca divisa per gruppo (squadra / società): solo il mister pubblica, i giocatori verificati rispondono.
 import * as db from '../db.js';
 import { esc, fmtDate, toast, sheet, confirmDialog, fullName, $, $$ } from '../util.js';
+import { installBanner } from '../install.js';
 import { setHeader, route } from '../app.js';
 import { listProfiles, fillPhotos } from '../profiles.js';
 
@@ -126,6 +127,8 @@ export async function playerBoardView(root) {
   }), { threshold: [0.4] }) : null;
   $$('[data-n]', root).forEach((el) => (io ? io.observe(el) : confirmRead(el.dataset.n)));
 
+  const ib = installBanner();
+  if (ib) root.prepend(ib);
   if (mine) {
     import('../push.js').then(async (P) => {
       const st = await P.pushState();

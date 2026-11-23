@@ -1,4 +1,5 @@
 import * as db from './db.js';
+import './install.js';
 import * as sync from './sync.js';
 import { fillPhotos } from './profiles.js';
 import { esc, $, toast, pick } from './util.js';
@@ -233,7 +234,7 @@ function setTab(tab) {
 
 // ---------- Avvio ----------
 
-export const APP_VERSION = '1.19.0';
+export const APP_VERSION = '1.20.0';
 let swReg = null;
 
 /** Controlla subito se c'è una versione nuova dell'app; restituisce true se è stata trovata. */

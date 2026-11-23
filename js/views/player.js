@@ -7,6 +7,7 @@ import { buildLeaderboard, renderLeaderboard } from './leaderboard.js';
 import { PRIVACY_VERSION, showPrivacy } from '../privacy.js';
 import { eraseProfile } from '../profiles.js';
 import { setHeader } from '../app.js';
+import { installApp, shareApp, canOfferInstall } from '../install.js';
 import { PALETTE } from '../charts.js';
 
 let cache = null;
@@ -309,11 +310,15 @@ export async function playerMoreView(root) {
   root.innerHTML = `<div class="list">
     <a class="item" href="#/g/rose"><span style="font-size:24px">👥</span><div class="grow"><strong>Squadre e schede giocatori</strong><div class="muted small">Rose con foto · compila la tua scheda</div></div><span class="chev">›</span></a>
     <a class="item" href="#/g/marcatori"><span style="font-size:24px">🏆</span><div class="grow"><strong>Classifiche e marcatori</strong><div class="muted small">Campionati e classifica di tutte le giovanili</div></div><span class="chev">›</span></a>
+    ${canOfferInstall() ? '<button class="item" id="instApp"><span style="font-size:24px">📲</span><div class="grow"><strong>Installa l\'app sul telefono</strong><div class="muted small">Icona con lo stemma sulla schermata Home</div></div><span class="chev">›</span></button>' : ''}
+    <button class="item" id="shareApp"><span style="font-size:24px">📤</span><div class="grow"><strong>Invia il link dell'app</strong><div class="muted small">A compagni e genitori, con WhatsApp</div></div><span class="chev">›</span></button>
     <button class="item" id="pushset"><span style="font-size:24px">🔔</span><div class="grow"><strong>Notifiche sul telefono</strong><div class="muted small">Convocazioni, avvisi e cambi di orario</div></div><span class="chev">›</span></button>
     <button class="item" id="privacy"><span style="font-size:24px">🔒</span><div class="grow"><strong>Privacy</strong><div class="muted small">Informativa · cancella la mia scheda</div></div><span class="chev">›</span></button>
     <a class="item" href="#/g/esci"><span style="font-size:24px">🚪</span><div class="grow"><strong>Esci</strong><div class="muted small">Torna alla scelta dell'accesso</div></div><span class="chev">›</span></a>
   </div>`;
   $('#privacy', root).onclick = privacyMenu;
+  if ($('#instApp', root)) $('#instApp', root).onclick = installApp;
+  $('#shareApp', root).onclick = shareApp;
   $('#pushset', root).onclick = () => import('./board.js').then((m) => m.playerPushSheet());
 }
 

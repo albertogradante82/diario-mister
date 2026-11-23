@@ -6,7 +6,7 @@ import { applyAllProfiles } from './players.js';
 import { esc, on, toast, confirmDialog, pick, shareOrDownload, chooseFile, readText, fullName, sheet, $ } from '../util.js';
 import { setHeader, setCurrent, route, loadSeason, state, byNumber, APP_VERSION, checkForUpdate } from '../app.js';
 import * as sync from '../sync.js';
-import { installApp, shareApp, canOfferInstall } from '../install.js';
+import { installApp, shareApp } from '../install.js';
 
 const CATEGORIES = ['Piccoli Amici', 'Primi Calci', 'Pulcini', 'Esordienti', 'Giovanissimi', 'Allievi', 'Juniores', 'Altro'];
 
@@ -25,10 +25,10 @@ export async function roleChoiceView(root) {
       <h1>Calcio Palazzo</h1>
       <p class="muted">Diario del Mister · stagione ${esc(defaultSeasonName())}</p>
     </div>
-    ${canOfferInstall() ? '<button class="btn primary block mb" id="instApp">📲 Installa l\'app sul telefono</button>' : ''}
     <p class="small muted center-text mb">Chi sei?</p>
     <button class="choice choice-main" id="asPlayer"><span class="choice-icon">🏃</span><span><strong>Giocatore o genitore</strong><small>Avvisi della società, calendario, risultati, rose e classifiche.</small></span></button>
-    <button class="choice" id="asMister"><span class="choice-icon">📋</span><span><strong>Mister / dirigente</strong><small>Gestione completa: partite live, statistiche, giocatori. Serve la password.</small></span></button>`;
+    <button class="choice" id="asMister"><span class="choice-icon">📋</span><span><strong>Mister / dirigente</strong><small>Gestione completa: partite live, statistiche, giocatori. Serve la password.</small></span></button>
+    <button class="choice choice-install" id="instApp"><span class="choice-icon">📲</span><span><strong>Aggiungi alla Home (consigliato)</strong><small>L'icona con lo stemma sul telefono: app a schermo intero e notifiche.</small></span></button>`;
   if ($('#instApp', root)) $('#instApp', root).onclick = installApp;
   $('#asPlayer', root).onclick = () => { setRole('giocatore'); location.hash = '#/g/bacheca'; route(); };
   $('#asMister', root).onclick = async () => {
@@ -158,7 +158,7 @@ export async function moreView(root) {
 
     <h2 class="section">Informazioni</h2>
     <div class="card small">
-      ${canOfferInstall() ? '<button class="btn primary block mb" data-action="install">📲 Installa l\'app sul telefono</button>' : '<p class="ok mb">✓ App installata sul telefono</p>'}
+      <button class="btn primary block mb" data-action="install">📲 Aggiungi alla Home (consigliato)</button>
       <button class="btn block mb" data-action="shareapp">📤 Invia il link dell'app ai ragazzi</button>
       <div class="row gap center mb"><span class="grow">Versione <strong>${APP_VERSION}</strong></span><button class="btn small" data-action="update">Controlla aggiornamenti</button></div>
       <p class="muted">Nessun dato inviato a server senza archivio condiviso · rispetta la privacy dei minori: raccogli il consenso dei genitori per foto e dati.</p>

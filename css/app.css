@@ -480,3 +480,5 @@ body.no-tabs { padding-bottom: var(--safe-b); }
 .install-arrow { font-size: 44px; color: #fff; margin-top: 8px; animation: instb 1s ease-in-out infinite; }
 .install-arrow.top { position: absolute; top: 8px; right: 18px; margin: 0; }
 @keyframes instb { 50% { transform: translateY(8px); } }
+.choice-install { border: 2px dashed #1a9e55; background: #eefaf2; }
+@media (prefers-color-scheme: dark) { .choice-install { background: rgba(26,158,85,.15); } }

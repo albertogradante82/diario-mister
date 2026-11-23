@@ -19,7 +19,15 @@ const iosOtherBrowser = () => isIOS() && /CriOS|FxiOS|EdgiOS|OPiOS/.test(ua);
 export const canOfferInstall = () => !isStandalone();
 
 export async function installApp() {
-  if (isStandalone()) { toast('L\'app è già installata ✓'); return; }
+  if (isStandalone()) {
+    return sheet('📲 Aggiungi alla Home', (body) => {
+      body.innerHTML = `<p class="ok mb"><strong>✓ Su questo telefono l'app è già sulla schermata Home.</strong></p>
+        <p class="small muted">Se hai cancellato l'icona: apri il link in Safari (iPhone) o Chrome (Android) e tocca di nuovo questo pulsante.</p>
+        <button class="btn primary block mt" id="sh">📤 Invia il link a un altro telefono</button><button class="btn block mt" id="cp">📋 Copia link</button>`;
+      body.querySelector('#sh').onclick = shareApp;
+      body.querySelector('#cp').onclick = () => copyLink();
+    });
+  }
   if (deferred) {
     deferred.prompt();
     const { outcome } = await deferred.userChoice;
@@ -33,9 +41,9 @@ export async function installApp() {
 
 function iosGuide() {
   if (inAppBrowser()) {
-    return sheet('📲 Installa l\'app', (body) => {
+    return sheet('📲 Aggiungi alla Home', (body) => {
       body.innerHTML = `<p class="mb">Stai usando il browser interno di un'altra app (WhatsApp, Instagram…): da qui non si può installare.</p>
-        <ol class="install-steps"><li>Tocca <strong>Copia link</strong> qui sotto</li><li>Apri <strong>Safari</strong> e incolla il link</li><li>Tocca di nuovo <strong>📲 Installa l'app</strong></li></ol>
+        <ol class="install-steps"><li>Tocca <strong>Copia link</strong> qui sotto</li><li>Apri <strong>Safari</strong> e incolla il link</li><li>Tocca di nuovo <strong>📲 Aggiungi alla Home</strong></li></ol>
         <button class="btn primary block mt" id="cp">📋 Copia link</button>`;
       body.querySelector('#cp').onclick = () => copyLink();
     });
@@ -62,11 +70,11 @@ function iosGuide() {
 }
 
 function otherGuide() {
-  return sheet('📲 Installa l\'app', (body) => {
+  return sheet('📲 Aggiungi alla Home', (body) => {
     body.innerHTML = isAndroid()
       ? `<ol class="install-steps"><li>Apri il menu <strong>⋮</strong> di Chrome in alto a destra</li><li>Scegli <strong>Installa app</strong> (o <em>Aggiungi a schermata Home</em>)</li><li>Conferma con <strong>Installa</strong></li></ol>
          <p class="small muted">Se non vedi la voce, apri il link con <strong>Chrome</strong>.</p><button class="btn block mt" id="cp">📋 Copia link</button>`
-      : `<p>Apri questo link dal telefono: su iPhone con <strong>Safari</strong>, su Android con <strong>Chrome</strong>, poi tocca <strong>📲 Installa l'app</strong>.</p>
+      : `<p>Apri questo link dal telefono: su iPhone con <strong>Safari</strong>, su Android con <strong>Chrome</strong>, poi tocca <strong>📲 Aggiungi alla Home</strong>.</p>
          <p class="mt"><strong>${APP_URL}</strong></p><button class="btn block mt" id="cp">📋 Copia link</button>`;
     body.querySelector('#cp').onclick = () => copyLink();
   });
@@ -79,7 +87,7 @@ async function copyLink() {
 
 /** Invia il link dell'app (WhatsApp, messaggi…) */
 export async function shareApp() {
-  const text = 'App del Calcio Palazzo ⚽ Calendario, convocazioni, bacheca e notifiche. Aprila e tocca "📲 Installa l\'app":';
+  const text = 'App del Calcio Palazzo ⚽ Calendario, convocazioni, bacheca e notifiche. Aprila e tocca "📲 Aggiungi alla Home":';
   if (navigator.share) {
     try { await navigator.share({ title: 'Calcio Palazzo', text, url: APP_URL }); return; } catch (e) { if (e.name === 'AbortError') return; }
   }
@@ -97,7 +105,7 @@ export function installBanner() {
   box.className = 'card small row gap center install-banner';
   box.innerHTML = `<img src="icons/apple-touch-icon.png?v=2" alt="" style="width:40px;height:40px;border-radius:9px">
     <div class="grow"><strong>Metti l'app sul telefono</strong><div class="muted">Icona sulla schermata Home e notifiche</div></div>
-    <div><button class="btn primary small" data-inst>📲 Installa</button><button class="btn-text small" data-insthide>No</button></div>`;
+    <div><button class="btn primary small" data-inst>📲 Aggiungi</button><button class="btn-text small" data-insthide>No</button></div>`;
   box.querySelector('[data-inst]').onclick = installApp;
   box.querySelector('[data-insthide]').onclick = () => { localStorage.setItem('mister-install-hide', '1'); box.remove(); };
   return box;

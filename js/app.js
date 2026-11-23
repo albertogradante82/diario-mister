@@ -11,7 +11,7 @@ import { homeView } from './views/home.js';
 import { playerBoardView, misterBoardView, updateBadge } from './views/board.js';
 import { misterConvView, playerConvView } from './views/convocazioni.js';
 import { videoListView } from './views/video.js';
-import { staffView } from './views/staff.js';
+import { staffView, playerStaffView } from './views/staff.js';
 import { playerCalendarView, playerRosterView, playerScorersView, playerProfileView, playerProfileEditView, playerMoreView } from './views/player.js';
 import { roleChoiceView, autoUpdateClubData } from './views/more.js';
 import { getRole, logout } from './roles.js';
@@ -132,6 +132,7 @@ const playerRoutes = [
   [/^#\/g\/allenamenti$/, playerConvView('allenamento'), 'g-all'],
   [/^#\/g\/altro$/, playerMoreView, 'g-altro'],
   [/^#\/g\/calendario$/, playerCalendarView, 'g-cal'],
+  [/^#\/g\/staff$/, playerStaffView, 'g-altro'],
   [/^#\/g\/rose$/, playerRosterView, 'g-altro'],
   [/^#\/g\/marcatori$/, playerScorersView, 'g-altro'],
   [/^#\/g\/giocatore\/([^/]+)\/modifica$/, playerProfileEditView, 'g-altro'],
@@ -236,7 +237,7 @@ function setTab(tab) {
 
 // ---------- Avvio ----------
 
-export const APP_VERSION = '1.21.0';
+export const APP_VERSION = '1.22.0';
 let swReg = null;
 
 /** Controlla subito se c'è una versione nuova dell'app; restituisce true se è stata trovata. */

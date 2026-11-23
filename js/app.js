@@ -233,7 +233,7 @@ function setTab(tab) {
 
 // ---------- Avvio ----------
 
-export const APP_VERSION = '1.18.0';
+export const APP_VERSION = '1.19.0';
 let swReg = null;
 
 /** Controlla subito se c'è una versione nuova dell'app; restituisce true se è stata trovata. */
@@ -279,7 +279,12 @@ window.addEventListener('DOMContentLoaded', async () => {
   route();
   sync.start();
   // il mister riceve da solo i dati aggiornati della società
-  const checkClub = async () => { if ((await getRole()) === 'mister') autoUpdateClubData().catch(() => {}); };
+  const checkClub = async () => {
+    if ((await getRole()) !== 'mister') return;
+    await autoUpdateClubData().catch(() => {});
+    const n = await import('./calmods.js').then((c) => c.applyModsToDb()).catch(() => 0);
+    if (n && !/\/(modifica|nuovo|nuova|live)$/.test(location.hash) && !document.querySelector('.sheet-back')) route();
+  };
   setTimeout(checkClub, 1500);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkClub(); });
   db.requestPersistence();

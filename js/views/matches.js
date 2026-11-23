@@ -10,6 +10,7 @@ import { barChart, pitchHeatmap } from '../charts.js';
 import { parseTracking, checkMeta } from '../tracking.js';
 import { editConvocation } from './convocazioni.js';
 import { videoCard } from './video.js';
+import { moveMatchSheet, saveMod } from '../calmods.js';
 
 const PERIOD_NAMES = ['1° tempo', '2° tempo', '3° tempo'];
 const COMPETITIONS = ['Campionato', 'Torneo', 'Amichevole', 'Coppa'];
@@ -130,6 +131,7 @@ export async function matchEditView(root, id) {
   $('#mf', root).onsubmit = async (e) => {
     e.preventDefault();
     const f = new FormData(e.target);
+    const before = `${m.date}|${m.time || ''}|${m.place || ''}`;
     m.opponent = f.get('opponent').trim();
     m.date = f.get('date');
     m.time = f.get('time');
@@ -143,8 +145,13 @@ export async function matchEditView(root, id) {
     m.squad = f.getAll('squad');
     m.periods = m.periods || [];
     m.periods[0] = { ...(m.periods[0] || {}), onFieldStart: f.getAll('starter') };
+    const moved = id && before !== `${m.date}|${m.time || ''}|${m.place || ''}` && /^imp-/.test(String(m.teamId));
+    if (moved) m.moved = true;
     await db.put('matches', m);
-    toast('Partita salvata');
+    if (moved) {
+      try { const r = await saveMod(m, matchTitle(m, ctx.team)); toast(`Partita spostata per tutti ✓${r.sent ? ` · avvisati ${r.sent} telefoni` : ''}`, 3500); }
+      catch (err) { toast('Salvata solo su questo telefono: ' + err.message, 5000); }
+    } else toast('Partita salvata');
     location.hash = `#/partita/${m.id}`;
   };
   if (id) {
@@ -193,6 +200,7 @@ export async function matchView(root, id) {
       <div class="mh-title">${esc(matchTitle(m, ctx.team))}</div>
       <div class="mh-score">${scoreLabel(m, s)}</div>
       <div class="muted small">${esc(m.status)} · ${n} ${n === 1 ? 'tempo' : 'tempi'} da ${m.periodMinutes}′</div>
+      ${m.status !== 'finita' ? '<button class="btn block mt" id="spost">📅 Cambia data e ora</button>' : ''}
       <button class="btn block mt" id="convoca">📋 Convoca i ragazzi (rispondono dall'app)</button>
       <a class="btn primary block mt" href="#/partita/${id}/live">${m.status === 'finita' ? '✏️ Apri tagging eventi' : m.status === 'in corso' ? '▶ Continua live' : '▶ Avvia live'}</a>
     </div>
@@ -265,6 +273,7 @@ export async function matchView(root, id) {
     </section>`;
 
   videoCard($('#videoBox', root), m);
+  if ($('#spost', root)) $('#spost', root).onclick = async () => { if (await moveMatchSheet(m, matchTitle(m, ctx.team))) route(); };
   $('#convoca', root).onclick = () => editConvocation(null, { code: null, match: m, kind: 'partita' });
   $$('#tabs button', root).forEach((b) => (b.onclick = () => {
     sessionStorage.setItem('matchTab', b.dataset.tab);

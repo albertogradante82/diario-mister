@@ -355,6 +355,8 @@ export async function mergeRose(json, { silent = false } = {}) {
   await write('players', players);
   await write('matches', matches);
   await write('events', events);
+  // gli spostamenti decisi dal mister valgono sopra al calendario ufficiale
+  await import('../calmods.js').then((c) => c.applyModsToDb()).catch(() => {});
   // squadra iniziale: preferibilmente una con il calendario già caricato
   const first = teams.find((t) => matches.some((m) => m.teamId === t.id)) || teams[0];
   if (!state.teamId && first) await setCurrent(first.id, seasons.find((s) => s.teamId === first.id)?.id || null);

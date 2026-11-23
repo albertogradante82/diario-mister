@@ -53,7 +53,7 @@ export async function calendarView(root) {
           <div class="cal-time">${esc(m.time || '')}</div>
           <div class="grow"><div class="small" style="color:${color[m.teamId]};font-weight:700">${esc(t.name)}</div>
             <strong>${m.home === false ? esc(m.opponent) + ' – Palazzo' : 'Palazzo – ' + esc(m.opponent)}</strong>
-            <div class="muted small">${m.home === false ? 'trasferta' : 'in casa'}${m.round ? ' · ' + esc(m.round) : ''}${m.place ? ' · ' + esc(m.place) : ''}</div></div>
+            <div class="muted small">${m.moved && m.status !== 'finita' ? '<b class="warn">🔄 spostata</b> · ' : ''}${m.home === false ? 'trasferta' : 'in casa'}${m.round ? ' · ' + esc(m.round) : ''}${m.place ? ' · ' + esc(m.place) : ''}</div></div>
           ${res ? `<span class="score ${out}">${res}</span>` : m.status === 'in corso' ? '<span class="badge live">LIVE</span>' : ''}
         </button>`;
       }).join('')}</div>`).join('')

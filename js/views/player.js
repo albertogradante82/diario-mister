@@ -15,6 +15,7 @@ async function load() {
   const r = await fetch('./dati/pubblico.json', { cache: 'no-cache' });
   if (!r.ok) throw new Error('Dati non disponibili');
   cache = await r.json();
+  await import('../calmods.js').then((c) => c.applyModsToPublic(cache)).catch(() => {});
   return cache;
 }
 
@@ -72,7 +73,7 @@ export async function playerCalendarView(root) {
             <div class="date-box"><b>${esc(fmtDate(m.date, { day: '2-digit' }))}</b><small>${esc(fmtDate(m.date, { month: 'short' }))}</small></div>
             <div class="grow"><div class="small" style="color:${color[m.teamId]};font-weight:700">${esc(tname[m.teamId] || '')}</div>
               <strong>${m.home === false ? `${esc(m.opponent)} – Palazzo` : `Palazzo – ${esc(m.opponent)}`}</strong>
-              <div class="muted small">${m.time ? 'ore ' + esc(m.time) + ' · ' : ''}${m.home === false ? 'trasferta' : 'in casa'}${m.round ? ' · ' + esc(m.round) : ''}</div>
+              <div class="muted small">${m.moved && !m.played ? '<b class="warn">🔄 spostata</b> · ' : ''}${m.time ? 'ore ' + esc(m.time) + ' · ' : ''}${m.home === false ? 'trasferta' : 'in casa'}${m.round ? ' · ' + esc(m.round) : ''}</div>
               ${m.scorers && m.scorers.length ? `<div class="small">⚽ ${m.scorers.map(esc).join(', ')}</div>` : ''}</div>
             ${res ? `<span class="score ${out}">${res}</span>` : ''}</div>`;
         }).join('')}</div>` : `<div class="empty"><p>${mode === 'prossime' ? 'Nessuna partita in programma.' : 'Nessun risultato ancora.'}</p></div>`}`;

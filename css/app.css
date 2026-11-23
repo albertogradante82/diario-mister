@@ -493,3 +493,6 @@ body.no-tabs { padding-bottom: var(--safe-b); }
 .vstar-inline { font-style: normal; display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: #1a9e55; color: #fff; font-size: 11px; line-height: 1; vertical-align: 2px; }
 .staff-av { position: relative; display: inline-grid; place-items: center; font-size: 20px; }
 .cert-card { border: 1.5px solid #1a9e55; background: rgba(26,158,85,.08); }
+.table.standings tr.zona-playout td:first-child { box-shadow: inset 4px 0 0 #e0a800; }
+.table.standings tr.zona-retrocessione td:first-child { box-shadow: inset 4px 0 0 var(--ko, #d33); }
+.zona-dot.zona-playout { background: #e0a800; } .zona-dot.zona-retrocessione { background: var(--ko, #d33); }

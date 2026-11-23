@@ -482,3 +482,10 @@ body.no-tabs { padding-bottom: var(--safe-b); }
 @keyframes instb { 50% { transform: translateY(8px); } }
 .choice-install { border: 2px dashed #1a9e55; background: #eefaf2; }
 @media (prefers-color-scheme: dark) { .choice-install { background: rgba(26,158,85,.15); } }
+/* staff in convocazione */
+.staff-pick { display: flex; flex-direction: column; gap: 6px; margin: 6px 0; }
+.staff-btn { display: flex; align-items: center; gap: 10px; text-align: left; padding: 10px 12px; border-radius: 12px; border: 1.5px solid var(--line); background: var(--card, #fff); color: inherit; font: inherit; }
+.staff-btn small { display: block; color: var(--muted, #667); font-size: 12px; }
+.staff-btn.on { border-color: var(--accent); background: rgba(28,100,200,.08); }
+.staff-check { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--line); display: grid; place-items: center; font-weight: 800; color: #fff; flex: none; }
+.staff-btn.on .staff-check { background: var(--accent); border-color: var(--accent); }

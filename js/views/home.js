@@ -113,6 +113,8 @@ export async function homeView(root) {
 
     <h2 class="section">Azioni rapide</h2>
     <div class="quick">
+      <button class="quick-btn" id="newstaff"><span>🧑‍💼</span>Nuovo mister / accompagnatore</button>
+      <a class="quick-btn" href="#/staff"><span>🪪</span>Staff e documenti</a>
       <a class="quick-btn" href="#/convocazioni"><span>⚽</span>Convocazioni partita</a>
       <a class="quick-btn" href="#/allenamenti"><span>🏃</span>Presenze allenamenti</a>
       <a class="quick-btn" href="#/bacheca"><span>📣</span>Bacheca</a>
@@ -124,6 +126,11 @@ export async function homeView(root) {
       <a class="quick-btn" href="#/altro"><span>📂</span>Importa / backup</a>
     </div>`;
 
+  root.querySelector('#newstaff').onclick = async () => {
+    const { editStaff } = await import('./staff.js');
+    const s = await editStaff(null);
+    if (s && s.id) location.hash = '#/staff';
+  };
   const cn = root.querySelector('#convnext');
   if (cn) cn.onclick = () => editConvocation(null, { code: null, match: next, kind: 'partita' });
   const ub = root.querySelector('#clubupd');

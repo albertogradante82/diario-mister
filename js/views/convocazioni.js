@@ -4,6 +4,9 @@ import { esc, fmtDate, toast, sheet, confirmDialog, fullName, today, $, $$ } fro
 import { setHeader, route, byNumber } from '../app.js';
 import { fillPhotos } from '../profiles.js';
 import { me, linkProfile, updateBadge } from './board.js';
+import { listStaff, staffName, staffIdent, editStaff } from './staff.js';
+
+let staffCache = {};
 
 const API = './api/convocazioni';
 const LABEL = {
@@ -77,6 +80,7 @@ export function playerConvView(kind) {
           <strong class="notice-title">${esc(c.title)}</strong>
           <div class="notice-when">🗓️ ${whenTxt(c)}${c.meetTime ? ` · ritrovo ${esc(c.meetTime)}` : ''}${c.place ? ` · 📍 ${esc(c.place)}` : ''}</div>
           ${c.note ? `<div class="notice-text">${esc(c.note)}</div>` : ''}
+          ${(c.staff || []).length ? `<div class="small mt">🧑‍💼 ${c.staff.map((x) => `${esc(x.name)} <span class="muted">(${esc(x.role)})</span>`).join(' · ')}</div>` : ''}
           <div class="conv-answer mt">${r ? (r.r === 'si' ? `✅ Hai risposto: <strong>${kind === 'partita' ? 'presente' : 'P – presente'}</strong>` : `❌ Hai risposto: <strong>${kind === 'partita' ? 'non ci sono' : 'A – assente'}</strong>${r.note ? ` (${esc(r.note)})` : ''}`) : '<span class="warn">⏳ Il mister aspetta la tua risposta</span>'}</div>
           ${c.closed ? '<p class="small muted">Risposte chiuse.</p>' : kind === 'allenamento'
             ? `<div class="pa-row mt"><button class="pa-btn pa-p ${r?.r === 'si' ? 'on' : ''}" data-yes="${c.id}">P<small>presente</small></button><button class="pa-btn pa-a ${r?.r === 'no' ? 'on' : ''}" data-no="${c.id}">A<small>assente</small></button></div>`
@@ -118,6 +122,7 @@ export function misterConvView(kind) {
     try {
       items = (await listConvocations()).filter((c) => (kind === 'allenamento' ? c.kind === 'allenamento' : c.kind !== 'allenamento'));
       if (code) resp = (await call(`${API}?action=responses`, { headers: { 'x-admin-code': code } })).responses || {};
+      if (code) { try { staffCache = Object.fromEntries((await listStaff()).map((x) => [x.id, x])); } catch { /* */ } }
     } catch (e) { root.innerHTML = `<div class="empty"><p>${esc(e.message)}</p></div>`; return; }
     let team = sessionStorage.getItem('convTeam') || 'tutte';
     const show = sessionStorage.getItem('convShow') || 'prossime';
@@ -187,6 +192,7 @@ function convCard(c, r, byId, teams, kind) {
     <div class="small muted">${L.icon} ${team ? esc(team.name) : ''}${c.closed ? ' · 🔒 chiuso' : ''}</div>
     <strong class="notice-title">${esc(c.title)}</strong>
     <div class="notice-when">🗓️ ${whenTxt(c)}${c.meetTime ? ` · ritrovo ${esc(c.meetTime)}` : ''}${c.place ? ` · 📍 ${esc(c.place)}` : ''}</div>
+    ${(c.staff || []).length ? `<div class="small mt staff-line">🧑‍💼 <strong>Staff:</strong> ${c.staff.map((x) => { const f = staffCache[x.id]; return `${esc(f ? staffName(f) : x.name)} <span class="muted">(${esc(f?.role || x.role)}${f && staffIdent(f) ? ' · ' + esc(staffIdent(f)) : ''})</span>`; }).join(' · ')}</div>` : ''}
     <div class="conv-count mt"><span class="ok">${kind === 'allenamento' ? 'P' : '✅'} ${yes.length}</span><span class="ko">${kind === 'allenamento' ? 'A' : '❌'} ${no.length}</span><span class="muted">⏳ ${wait.length}</span><span class="muted">su ${c.players.length}</span></div>
     <details class="seen mt"><summary>Vedi le risposte</summary>
       ${yes.length ? `<div class="small ok mt"><strong>${L.yesShort}</strong></div><div class="seen-list">${yes.map((id) => chip(id)).join('')}</div>` : ''}
@@ -218,6 +224,9 @@ export async function editConvocation(c, { teams, players, code, match = null, t
     note: '', players: match?.squad?.length ? match.squad : players.filter((p) => p.teamId === team0).map((p) => p.id),
   };
   const isNewTraining = kind === 'allenamento' && !c.id;
+  let staff = [];
+  try { staff = await listStaff(); } catch { /* */ }
+  const staffSel = new Set((c.staff || []).map((x) => x.id));
   const saved = await sheet(c.id ? 'Modifica' : kind === 'allenamento' ? 'Nuovo allenamento' : 'Nuova convocazione', (body, close) => {
     const draw = (teamSel, sel) => {
       const pool = players.filter((p) => p.teamId === teamSel).sort(byNumber);
@@ -232,6 +241,12 @@ export async function editConvocation(c, { teams, players, code, match = null, t
         <label>Note<textarea name="note" rows="2" maxlength="600">${esc(c.note)}</textarea></label>
         <div class="row center"><span class="small muted grow">Giocatori: <b id="cnt">${sel.size}</b></span><button type="button" class="btn-text small" id="all">Tutti</button><button type="button" class="btn-text small" id="none">Nessuno</button></div>
         <div class="num-grid mb">${pool.map((p) => `<button type="button" class="num-btn ${sel.has(p.id) ? 'on' : ''}" data-p="${p.id}"><b>${esc(p.number !== '' && p.number != null ? p.number : ((p.firstName || '')[0] || '') + ((p.lastName || '')[0] || ''))}</b><small>${esc(p.lastName || p.firstName)}</small></button>`).join('')}</div>
+        <h3 class="mt">🧑‍💼 Mister e accompagnatori</h3>
+        <div class="staff-pick">${staff.slice().sort((a, b) => (b.teams.includes(teamSel) - a.teams.includes(teamSel)) || staffName(a).localeCompare(staffName(b))).map((x) => `
+          <button type="button" class="staff-btn ${staffSel.has(x.id) ? 'on' : ''}" data-st="${x.id}"><span class="staff-check">${staffSel.has(x.id) ? '✓' : ''}</span>
+            <span class="grow"><strong>${esc(staffName(x))}</strong><small>${esc(x.role)}${staffIdent(x) ? ' · ' + esc(staffIdent(x)) : ' · <span class="warn">manca matricola/documento</span>'}</small></span></button>`).join('')
+          || '<p class="small muted">Nessun profilo staff: crealo qui sotto.</p>'}</div>
+        <button type="button" class="btn-text small mb" id="newstaff">➕ Nuovo mister / accompagnatore</button>
         <button class="btn primary block">${c.id ? 'Salva' : kind === 'allenamento' ? '🏃 Pubblica allenamento' : '📋 Pubblica convocazione'}</button></form>`;
       const f = body.querySelector('#cf');
       f.teamId.onchange = () => { c = readForm(f, c); draw(f.teamId.value, new Set(players.filter((p) => p.teamId === f.teamId.value).map((p) => p.id))); };
@@ -239,9 +254,21 @@ export async function editConvocation(c, { teams, players, code, match = null, t
       $$('[data-p]', body).forEach((b) => (b.onclick = () => { sel.has(b.dataset.p) ? sel.delete(b.dataset.p) : sel.add(b.dataset.p); b.classList.toggle('on'); cnt(); }));
       body.querySelector('#all').onclick = () => { pool.forEach((p) => sel.add(p.id)); $$('[data-p]', body).forEach((b) => b.classList.add('on')); cnt(); };
       body.querySelector('#none').onclick = () => { sel.clear(); $$('[data-p]', body).forEach((b) => b.classList.remove('on')); cnt(); };
+      $$('[data-st]', body).forEach((b) => (b.onclick = () => {
+        const on = !staffSel.has(b.dataset.st);
+        if (on) staffSel.add(b.dataset.st); else staffSel.delete(b.dataset.st);
+        b.classList.toggle('on', on); b.querySelector('.staff-check').textContent = on ? '✓' : '';
+      }));
+      body.querySelector('#newstaff').onclick = async () => {
+        c = readForm(f, c);
+        const created = await editStaff(null);
+        if (created && created.id) { staff.push(created); staffSel.add(created.id); }
+        draw(f.teamId.value, sel);
+      };
       f.onsubmit = async (e) => {
         e.preventDefault();
-        const data = { ...readForm(f, c), kind, players: [...sel] };
+        const data = { ...readForm(f, c), kind, players: [...sel],
+          staff: staff.filter((x) => staffSel.has(x.id)).map((x) => ({ id: x.id, name: staffName(x), role: x.role })) };
         const fd = new FormData(f);
         const days = fd.getAll('days'), until = fd.get('until');
         let dates = [data.date];

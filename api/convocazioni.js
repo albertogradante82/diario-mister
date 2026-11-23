@@ -72,6 +72,9 @@ module.exports = async function handler(req, res) {
         date: b.date, time: /^\d{2}:\d{2}$/.test(String(b.time || '')) ? b.time : '',
         meetTime: /^\d{2}:\d{2}$/.test(String(b.meetTime || '')) ? b.meetTime : '', place: str(b.place, 120),
         note: str(b.note, 600), players, closed: !!b.closed,
+        // staff in distinta: qui solo nome e ruolo (i documenti restano nell'area mister)
+        staff: Array.isArray(b.staff) ? b.staff.filter((x) => x && /^s-[0-9a-f]{16}$/.test(String(x.id))).slice(0, 10)
+          .map((x) => ({ id: x.id, name: str(x.name, 80), role: str(x.role, 40) })) : [],
         createdAt: prev ? prev.createdAt : Date.now(), updatedAt: Date.now(),
       };
       await pipeline(cfg, [['HSET', 'conv:list', id, JSON.stringify(item)]]);

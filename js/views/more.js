@@ -158,6 +158,7 @@ export async function moreView(root) {
       <p><strong>Installare su iPhone:</strong> apri il link in Safari → tasto Condividi → <em>Aggiungi alla schermata Home</em>. L'app funziona anche senza connessione.</p>
       <div class="row gap center mb"><span class="grow">Versione <strong>${APP_VERSION}</strong></span><button class="btn small" data-action="update">Controlla aggiornamenti</button></div>
       <p class="muted">Nessun dato inviato a server senza archivio condiviso · rispetta la privacy dei minori: raccogli il consenso dei genitori per foto e dati.</p>
+      <button class="btn block mt" data-action="push">🔔 Notifiche sul telefono</button>
       <button class="btn block mt" data-action="privacy">🔒 Informativa privacy</button>
       <button class="btn block mt" data-action="logout">🚪 Esci (cambia accesso)</button>
       <button class="btn danger block mt" data-action="wipe">Cancella tutti i dati</button>
@@ -176,6 +177,11 @@ export async function moreView(root) {
   on(root, 'clubData', loadClubData);
   on(root, 'profiles', applyAllProfiles);
   on(root, 'privacy', () => import('../privacy.js').then((m) => m.showPrivacy()));
+  on(root, 'push', () => import('../push.js').then((P) => P.pushSheet(async () => {
+    const adminCode = await db.getMeta('clubCode');
+    if (!adminCode) { toast('Prima carica i dati del Calcio Palazzo con la password.', 4000); return null; }
+    return { role: 'mister', adminCode };
+  }, 'le risposte dei ragazzi in bacheca')));
   on(root, 'logout', async () => {
     if (!(await confirmDialog('Uscire dall\'accesso mister? I dati restano su questo telefono; per rientrare servirà la password.', 'Esci'))) return;
     logout();

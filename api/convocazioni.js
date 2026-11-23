@@ -5,6 +5,7 @@
 //   conv:resp:<id>   hash playerId -> JSON { r: 'si'|'no', note, at }
 const crypto = require('crypto');
 const { redisConfig, pipeline, pinHash, safeEq, isAdmin, ip, send, readBody, limited, hashToObj } = require('./_lib.js');
+const { notify, quando } = require('./_push.js');
 
 const PID = /^imp-[0-9a-f]{16}$/;
 const CID = /^c-[0-9a-f]{16}$/;
@@ -74,6 +75,25 @@ module.exports = async function handler(req, res) {
         createdAt: prev ? prev.createdAt : Date.now(), updatedAt: Date.now(),
       };
       await pipeline(cfg, [['HSET', 'conv:list', id, JSON.stringify(item)]]);
+      // notifiche: solo per eventi di oggi o futuri
+      const today = new Date(Date.now() + 3600e3).toISOString().slice(0, 10);
+      if (b.notify !== false && item.date >= today) {
+        const isAll = item.kind === 'allenamento';
+        const dove = [quando(item.date, item.time), item.meetTime ? 'ritrovo ' + item.meetTime : '', item.place].filter(Boolean).join(' · ');
+        const url = isAll ? './#/g/allenamenti' : './#/g/convocazioni';
+        const moved = prev && (prev.date !== item.date || prev.time !== item.time || prev.meetTime !== item.meetTime || prev.place !== item.place);
+        const nuovi = prev ? players.filter((p) => !prev.players.includes(p)) : players;
+        const vecchi = prev ? players.filter((p) => prev.players.includes(p)) : [];
+        if (nuovi.length) {
+          await notify(cfg, { players: nuovi }, {
+            title: isAll ? `🏃 ${item.title}` : `📋 Sei convocato: ${item.title}`,
+            body: (dove + (isAll ? '' : ' — Rispondi Presente o Non ci sono')).slice(0, 180), url, tag: 'conv-' + id,
+          });
+        }
+        if (moved && vecchi.length) {
+          await notify(cfg, { players: vecchi }, { title: `🔄 Cambio orario: ${item.title}`, body: dove.slice(0, 180), url, tag: 'conv-' + id });
+        }
+      }
       return send(res, 200, { item });
     }
 
@@ -100,7 +120,18 @@ module.exports = async function handler(req, res) {
     if (req.method === 'POST' && action === 'delete') {
       const { id } = await readBody(req);
       if (!CID.test(String(id))) return send(res, 400, { error: 'Id non valido.' });
+      const [rawC] = await pipeline(cfg, [['HGET', 'conv:list', id]]);
       await pipeline(cfg, [['HDEL', 'conv:list', id], ['DEL', `conv:resp:${id}`]]);
+      if (rawC) {
+        const c = JSON.parse(rawC);
+        const today = new Date(Date.now() + 3600e3).toISOString().slice(0, 10);
+        if (c.date >= today) {
+          await notify(cfg, { players: c.players }, {
+            title: `❌ Annullato: ${c.title}`, body: quando(c.date, c.time),
+            url: c.kind === 'allenamento' ? './#/g/allenamenti' : './#/g/convocazioni', tag: 'conv-' + id,
+          });
+        }
+      }
       return send(res, 200, { ok: true });
     }
 

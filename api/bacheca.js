@@ -6,6 +6,7 @@
 //   avv:rep:<id>    lista JSON risposte { rid, playerId, name, text, at, mister }
 const crypto = require('crypto');
 const { redisConfig, pipeline, pinHash, safeEq, isAdmin, ip, send, readBody, limited, hashToObj } = require('./_lib.js');
+const { notify, quando } = require('./_push.js');
 
 const PID = /^imp-[0-9a-f]{16}$/;
 const AID = /^a-[0-9a-f]{16}$/;
@@ -67,6 +68,7 @@ module.exports = async function handler(req, res) {
       const name = await playerName(req, playerId);
       const rep = { rid: crypto.randomBytes(6).toString('hex'), playerId, name, text: t, at: Date.now() };
       await pipeline(cfg, [['RPUSH', `avv:rep:${avvisoId}`, JSON.stringify(rep)], ['HSETNX', `avv:read:${avvisoId}`, playerId, String(Date.now())]]);
+      await notify(cfg, { mister: true }, { title: `💬 ${rep.name}`, body: rep.text.slice(0, 180), url: './#/bacheca', tag: 'rep-' + avvisoId });
       return send(res, 200, { reply: rep });
     }
 
@@ -100,6 +102,16 @@ module.exports = async function handler(req, res) {
         createdAt: prev ? prev.createdAt : Date.now(), updatedAt: Date.now(),
       };
       await pipeline(cfg, [['HSET', 'avv:list', id, JSON.stringify(item)]]);
+      // notifica: nuovo avviso, oppure cambio di data/ora/luogo
+      const changed = prev && (prev.date !== item.date || prev.time !== item.time || prev.place !== item.place);
+      if ((!prev || changed) && b.notify !== false) {
+        const dove = [quando(item.date, item.time), item.place].filter(Boolean).join(' · ');
+        await notify(cfg, item.teams.length ? { teams: item.teams } : { all: true }, {
+          title: (changed ? '🔄 Cambio: ' : '📌 ') + item.title,
+          body: (changed ? (dove || 'Avviso aggiornato') : [dove, item.text].filter(Boolean).join(' — ')).slice(0, 180),
+          url: './#/g/bacheca', tag: 'avv-' + id,
+        });
+      }
       return send(res, 200, { item });
     }
 
@@ -109,6 +121,12 @@ module.exports = async function handler(req, res) {
       if (!AID.test(String(avvisoId)) || !t) return send(res, 400, { error: 'Scrivi un messaggio.' });
       const rep = { rid: crypto.randomBytes(6).toString('hex'), playerId: '', name: str(author, 40) || 'Mister', text: t, at: Date.now(), mister: true };
       await pipeline(cfg, [['RPUSH', `avv:rep:${avvisoId}`, JSON.stringify(rep)]]);
+      const [rawA] = await pipeline(cfg, [['HGET', 'avv:list', avvisoId]]);
+      if (rawA) {
+        const a = JSON.parse(rawA);
+        await notify(cfg, a.teams && a.teams.length ? { teams: a.teams } : { all: true },
+          { title: `💬 ${rep.name} · ${a.title}`, body: t.slice(0, 180), url: './#/g/bacheca', tag: 'rep-' + avvisoId });
+      }
       return send(res, 200, { reply: rep });
     }
 

@@ -308,10 +308,12 @@ export async function playerMoreView(root) {
   root.innerHTML = `<div class="list">
     <a class="item" href="#/g/rose"><span style="font-size:24px">👥</span><div class="grow"><strong>Squadre e schede giocatori</strong><div class="muted small">Rose con foto · compila la tua scheda</div></div><span class="chev">›</span></a>
     <a class="item" href="#/g/marcatori"><span style="font-size:24px">🏆</span><div class="grow"><strong>Classifiche e marcatori</strong><div class="muted small">Campionati e classifica di tutte le giovanili</div></div><span class="chev">›</span></a>
+    <button class="item" id="pushset"><span style="font-size:24px">🔔</span><div class="grow"><strong>Notifiche sul telefono</strong><div class="muted small">Convocazioni, avvisi e cambi di orario</div></div><span class="chev">›</span></button>
     <button class="item" id="privacy"><span style="font-size:24px">🔒</span><div class="grow"><strong>Privacy</strong><div class="muted small">Informativa · cancella la mia scheda</div></div><span class="chev">›</span></button>
     <a class="item" href="#/g/esci"><span style="font-size:24px">🚪</span><div class="grow"><strong>Esci</strong><div class="muted small">Torna alla scelta dell'accesso</div></div><span class="chev">›</span></a>
   </div>`;
   $('#privacy', root).onclick = privacyMenu;
+  $('#pushset', root).onclick = () => import('./board.js').then((m) => m.playerPushSheet());
 }
 
 async function privacyMenu() {

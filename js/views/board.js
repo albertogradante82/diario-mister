@@ -126,11 +126,35 @@ export async function playerBoardView(root) {
   }), { threshold: [0.4] }) : null;
   $$('[data-n]', root).forEach((el) => (io ? io.observe(el) : confirmRead(el.dataset.n)));
 
+  if (mine) {
+    import('../push.js').then(async (P) => {
+      const st = await P.pushState();
+      if (st === 'on' || st === 'unsupported' || localStorage.getItem('mister-push-hide') === '1') return;
+      const box = document.createElement('div');
+      box.className = 'card small row gap center';
+      box.innerHTML = `<span style="font-size:26px">🔔</span><div class="grow"><strong>Ricevi gli avvisi sul telefono</strong><div class="muted">Convocazioni, messaggi del mister e cambi di orario.</div></div>
+        <div><button class="btn primary small" id="pushon">Attiva</button><button class="btn-text small" id="pushhide">No</button></div>`;
+      root.querySelector('.card')?.after(box);
+      box.querySelector('#pushon').onclick = () => playerPushSheet().then(() => route());
+      box.querySelector('#pushhide').onclick = () => { localStorage.setItem('mister-push-hide', '1'); box.remove(); };
+    });
+  }
+
   const ul = $('#unlink', root);
   if (ul) ul.onclick = () => { localStorage.removeItem('mister-me'); route(); };
   const lk = $('#link', root);
   if (lk) lk.onclick = () => linkProfile(pub);
   return () => io && io.disconnect();
+}
+
+/** Notifiche per il giocatore collegato. */
+export async function playerPushSheet() {
+  const P = await import('../push.js');
+  return P.pushSheet(async () => {
+    const ident = me();
+    if (!ident) { toast('Prima collega il tuo profilo dalla Bacheca.', 4000); return null; }
+    return { playerId: ident.id, pin: ident.pin };
+  }, 'convocazioni, presenze allenamenti, messaggi in bacheca, cambi di orario e annullamenti');
 }
 
 export async function linkProfile(pub) {

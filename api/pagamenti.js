@@ -4,7 +4,7 @@
 // Redis:  pay:conf   JSON { season, unica:{amount,due}, rate:[{key,amount,due}] }
 //         pay:list   hash playerId -> JSON { plan:'unica'|'rate'|'', paid:{ unica|r1|r2: {at, amount, method, date} }, exempt, note, updatedAt }
 //         pay:fatt   hash playerId -> JSON { intestatario, codiceFiscale, partitaIva, indirizzo, cap, citta, provincia, email, pec, sdi, note, by, at }
-const { redisConfig, pipeline, isAdmin, ip, send, readBody, limited, hashToObj, authPlayer, roster } = require('./_lib.js');
+const { redisConfig, pipeline, isAdmin, ip, send, readBody, limited, hashToObj, authPlayer, roster, logActivity } = require('./_lib.js');
 const { notify } = require('./_push.js');
 
 const PID = /^imp-[0-9a-f]{16}$/;
@@ -70,6 +70,7 @@ module.exports = async function handler(req, res) {
         const item = { ...f, by: a.who.role === 'genitore' ? `genitore: ${a.who.name}` : 'giocatore', at: Date.now() };
         await pipeline(cfg, [['HSET', 'pay:fatt', b.playerId, JSON.stringify(item)]]);
         const ro = await roster(req);
+        await logActivity(cfg, { type: 'fattura', playerId: b.playerId, player: ro.players[b.playerId]?.name || '', name: f.intestatario, by: item.by });
         await notify(cfg, { mister: true }, { title: '🧾 Richiesta fattura', body: `${ro.players[b.playerId]?.name || 'Giocatore'}: intestata a ${f.intestatario}`, url: './#/pagamenti', tag: 'fatt-' + b.playerId });
         return send(res, 200, { fattura: item });
       }

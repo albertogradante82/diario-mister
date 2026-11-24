@@ -234,6 +234,7 @@ export async function misterBoardView(root) {
   const list = items.filter((n) => groupOf(n) === sel);
 
   root.innerHTML = `
+    <div id="inbox"></div>
     <div class="chips mb">${groups.map(([id, name]) => `<button class="chip-btn ${id === sel ? 'on' : ''}" data-g="${id}">${esc(name)}${count(id) ? ` <span class="muted">${count(id)}</span>` : ''}</button>`).join('')}</div>
     <button class="btn primary block mb" id="newn2">📣 Nuovo messaggio in “${esc(groups.find(([g]) => g === sel)[1])}”</button>
     ${list.length ? list.map((n) => {
@@ -251,6 +252,7 @@ export async function misterBoardView(root) {
     }).join('') : '<div class="empty"><div class="empty-icon">📣</div><p>Nessun messaggio in questa bacheca.</p></div>'}`;
   fillPhotos(root);
 
+  if (code) misterInbox($('#inbox', root), code);
   const open = (n) => editNotice(n, teams, code, n ? groupOf(n) : sel);
   $('#newn').onclick = () => open(null);
   $('#newn2', root).onclick = () => open(null);
@@ -302,3 +304,55 @@ async function editNotice(n, teams, code, group) {
 }
 
 export { groupChips };
+
+// ---------- Bacheca del mister: richieste da approvare e notifiche ----------
+
+const ACT = {
+  documento: ['📄', (a) => `<strong>${esc(a.player)}</strong> ha caricato <em>${esc(a.name)}</em>`, '#/documenti'],
+  ricevuta: ['💶', (a) => `<strong>${esc(a.player)}</strong>: ricevuta di pagamento <em>${esc(a.name)}</em>`, '#/pagamenti'],
+  fattura: ['🧾', (a) => `<strong>${esc(a.player)}</strong>: richiesta fattura intestata a <em>${esc(a.name)}</em>`, '#/pagamenti'],
+  genitore: ['👨‍👩‍👧', (a) => `<strong>${esc(a.name)}</strong> chiede di collegarsi a ${esc(a.player)}`, '#/genitori'],
+  staff: ['🧑‍💼', (a) => `<strong>${esc(a.name)}</strong> chiede di essere ${esc((a.role || 'accompagnatore').toLowerCase())}`, '#/staff'],
+};
+
+async function misterInbox(box, code) {
+  let d;
+  try { d = await call(`${API}?action=activity`, { headers: { 'x-admin-code': code } }); } catch { return; }
+  const { staffReqRow, bindStaffReq } = await import('./staff.js');
+  const lastSeen = Number(localStorage.getItem('mister-inbox-seen') || 0);
+  const fresh = d.log.filter((a) => a.at > lastSeen).length;
+  const when = (t) => new Date(t).toLocaleString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  const pend = d.staff.length + d.parents.length;
+  box.innerHTML = `
+    ${pend ? `<div class="card inbox-card"><h3>📥 Da approvare · ${pend}</h3>
+      ${d.staff.length ? `<div class="small muted">Accompagnatori</div><div class="list">${d.staff.map((s) => staffReqRow(s)).join('')}</div>` : ''}
+      ${d.parents.length ? `<div class="small muted mt">Genitori</div><div class="list">${d.parents.map((p) => `<div class="item"><div class="grow"><strong>${esc(p.name)}</strong> <span class="muted small">(${esc(p.relation || 'genitore')})</span>
+          <div class="small">vuole seguire <strong>${esc(p.player)}</strong> · ${esc(p.team)}</div>
+          <div class="row gap mt"><button class="btn small primary" data-pok="${p.parentId}|${p.playerId}">✓ Conferma</button><button class="btn small danger" data-pno="${p.parentId}|${p.playerId}">Rifiuta</button></div></div></div>`).join('')}</div>` : ''}
+    </div>` : ''}
+    <details class="card inbox-card" ${fresh ? 'open' : ''}><summary><strong>🔔 Notifiche</strong> ${fresh ? `<span class="chip-dot">${fresh}</span>` : `<span class="muted small">${d.log.length ? 'nessuna nuova' : 'nessuna'}</span>`}</summary>
+      ${d.log.length ? `<div class="list mt">${d.log.slice(0, 25).map((a) => {
+        const [icon, txt, href] = ACT[a.type] || ['•', () => esc(a.name || ''), '#/home'];
+        return `<a class="item ${a.at > lastSeen ? 'unread' : ''}" href="${href}"><span style="font-size:20px">${icon}</span><div class="grow"><div class="small">${txt(a)}</div><div class="muted small">${esc(when(a.at))}${a.by ? ' · ' + esc(a.by) : ''}</div></div><span class="chev">›</span></a>`;
+      }).join('')}</div>` : '<p class="small muted mt">Qui compaiono documenti, ricevute di pagamento, richieste di fattura e richieste di genitori e accompagnatori.</p>'}
+    </details>`;
+  bindStaffReq(box);
+  const act = async (action, v, msg) => {
+    const [parentId, playerId] = v.split('|');
+    try { await call(`./api/genitori?action=${action}`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-admin-code': code }, body: JSON.stringify({ parentId, playerId }) }); toast(msg); route(); } catch (e) { toast(e.message, 4000); }
+  };
+  $$('[data-pok]', box).forEach((b) => (b.onclick = () => act('approve', b.dataset.pok, 'Collegamento confermato ✓')));
+  $$('[data-pno]', box).forEach((b) => (b.onclick = async () => { if (await confirmDialog('Rifiutare la richiesta?', 'Rifiuta', true)) act('reject', b.dataset.pno, 'Richiesta rifiutata'); }));
+  const det = box.querySelector('details');
+  const markSeenAll = () => { if (d.log[0]) localStorage.setItem('mister-inbox-seen', String(d.log[0].at)); };
+  if (det.open) setTimeout(markSeenAll, 1500); else det.addEventListener('toggle', markSeenAll, { once: true });
+}
+
+/** Numero di richieste/notifiche nuove per il mister (badge sulla Home). */
+export async function misterInboxCount(code) {
+  try {
+    const d = await call(`${API}?action=activity`, { headers: { 'x-admin-code': code } });
+    const lastSeen = Number(localStorage.getItem('mister-inbox-seen') || 0);
+    return { pending: d.staff.length + d.parents.length, fresh: d.log.filter((a) => a.at > lastSeen).length };
+  } catch { return { pending: 0, fresh: 0 }; }
+}

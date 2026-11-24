@@ -5,7 +5,7 @@
 // Redis:  doc:meta            hash docId -> JSON { id, playerId, kind, name, mime, size, chunks, note, expiry, rata, by, at }
 //         doc:data:<id>:<n>   pezzo n del file (base64)
 const crypto = require('crypto');
-const { redisConfig, pipeline, isAdmin, ip, send, readBody, limited, hashToObj, authPlayer, roster } = require('./_lib.js');
+const { redisConfig, pipeline, isAdmin, ip, send, readBody, limited, hashToObj, authPlayer, roster, logActivity } = require('./_lib.js');
 const { notify } = require('./_push.js');
 
 const DID = /^d-[0-9a-f]{16}$/;
@@ -66,6 +66,7 @@ module.exports = async function handler(req, res) {
         };
         await pipeline(cfg, [['HSET', 'doc:meta', id, JSON.stringify(meta)]]);
         const r = await roster(req);
+        await logActivity(cfg, { type: b.kind === 'pagamento' ? 'ricevuta' : 'documento', kind: b.kind, playerId: b.playerId, player: r.players[b.playerId]?.name || '', name: meta.name, by: meta.by, docId: id });
         await notify(cfg, { mister: true }, { title: b.kind === 'pagamento' ? '💶 Ricevuta di pagamento' : '📄 Nuovo documento', body: `${r.players[b.playerId]?.name || 'Giocatore'}: ${meta.name}`, url: b.kind === 'pagamento' ? './#/pagamenti' : './#/documenti', tag: 'doc-' + id });
         return send(res, 200, { item: meta });
       }

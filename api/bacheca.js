@@ -5,7 +5,7 @@
 //   avv:read:<id>   hash playerId -> timestamp lettura
 //   avv:rep:<id>    lista JSON risposte { rid, playerId, name, text, at, mister }
 const crypto = require('crypto');
-const { redisConfig, pipeline, isAdmin, ip, send, readBody, limited, hashToObj, authPlayer } = require('./_lib.js');
+const { redisConfig, pipeline, isAdmin, ip, send, readBody, limited, hashToObj, authPlayer, roster: rosterOf } = require('./_lib.js');
 const { notify, quando } = require('./_push.js');
 
 const PID = /^imp-[0-9a-f]{16}$/;
@@ -142,6 +142,18 @@ module.exports = async function handler(req, res) {
       if (!AID.test(String(id))) return send(res, 400, { error: 'Id non valido.' });
       await pipeline(cfg, [['HDEL', 'avv:list', id], ['DEL', `avv:read:${id}`], ['DEL', `avv:rep:${id}`]]);
       return send(res, 200, { ok: true });
+    }
+
+    if (req.method === 'GET' && action === 'activity') {
+      // richieste da approvare (accompagnatori, genitori) e ultime attività (documenti, ricevute, fatture)
+      const [log, staffAll, parAll] = await pipeline(cfg, [['LRANGE', 'act:log', 0, 59], ['HGETALL', 'staff:list'], ['HGETALL', 'par:list']]);
+      const r = await rosterOf(req);
+      const staff = Object.values(hashToObj(staffAll)).map((j) => JSON.parse(j)).filter((s) => s.status === 'pending')
+        .map((s) => ({ id: s.id, name: `${s.firstName} ${s.lastName}`, role: s.role, matricola: s.matricola, docType: s.docType, docNumber: s.docNumber, phone: s.phone, email: s.email, at: s.createdAt }));
+      const parents = [];
+      Object.values(hashToObj(parAll)).map((j) => JSON.parse(j)).forEach((g) => (g.children || []).filter((c) => c.status === 'pending')
+        .forEach((c) => parents.push({ parentId: g.id, name: `${g.firstName} ${g.lastName}`, relation: g.relation, playerId: c.playerId, player: r.players[c.playerId]?.name || '', team: r.teams[r.players[c.playerId]?.teamId]?.name || '', at: c.at })));
+      return send(res, 200, { log: (log || []).map((j) => JSON.parse(j)), staff, parents });
     }
 
     if (req.method === 'GET' && action === 'reads') {

@@ -134,6 +134,19 @@ export async function homeView(root) {
     const s = await editStaff(null);
     if (s && s.id) location.hash = '#/staff';
   };
+  // richieste e notifiche nuove (documenti, ricevute, fatture, genitori, accompagnatori)
+  db.getMeta('clubCode').then(async (code) => {
+    if (!code) return;
+    const { misterInboxCount } = await import('./board.js');
+    const c = await misterInboxCount(code);
+    if (!c.pending && !c.fresh) return;
+    const h = [...root.querySelectorAll('h2.section')].find((x) => /Bacheca/.test(x.textContent));
+    if (!h) return;
+    const a = document.createElement('a');
+    a.className = 'card inbox-alert'; a.href = '#/bacheca';
+    a.innerHTML = `📥 ${c.pending ? `<strong>${c.pending} richieste da approvare</strong>` : ''}${c.pending && c.fresh ? ' · ' : ''}${c.fresh ? `${c.fresh} notifiche nuove` : ''} <span class="chev">›</span>`;
+    h.after(a);
+  });
   const cn = root.querySelector('#convnext');
   if (cn) cn.onclick = () => editConvocation(null, { code: null, match: next, kind: 'partita' });
   const ub = root.querySelector('#clubupd');

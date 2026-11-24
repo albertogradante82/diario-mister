@@ -96,4 +96,9 @@ async function roster(req) {
   return rosterCache;
 }
 
-module.exports = { redisConfig, pipeline, sha, pinHash, parPinHash, safeEq, isAdmin, ip, send, readBody, limited, hashToObj, authPlayer, roster };
+/** Registro delle attività (documenti, ricevute, fatture, richieste) mostrato al mister in bacheca. */
+async function logActivity(cfg, item) {
+  try { await pipeline(cfg, [['LPUSH', 'act:log', JSON.stringify({ ...item, at: Date.now() })], ['LTRIM', 'act:log', 0, 199]]); } catch { /* non blocca */ }
+}
+
+module.exports = { logActivity, redisConfig, pipeline, sha, pinHash, parPinHash, safeEq, isAdmin, ip, send, readBody, limited, hashToObj, authPlayer, roster };

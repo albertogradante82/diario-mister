@@ -6,7 +6,36 @@
 //         par:pin    hash parentId -> sha256 del PIN
 //         par:email  hash email (minuscolo) -> parentId
 const crypto = require('crypto');
-const { redisConfig, pipeline, pinHash, parPinHash, safeEq, isAdmin, ip, send, readBody, limited, hashToObj, roster } = require('./_lib.js');
+const { redisConfig, pipeline, sha, pinHash, parPinHash, safeEq, isAdmin, ip, send, readBody, limited, hashToObj, roster, logActivity } = require('./_lib.js');
+
+const STAFF_ROLES = ['Dirigente accompagnatore', 'Allenatore', 'Allenatore in seconda', 'Preparatore dei portieri', 'Preparatore atletico', 'Medico / massaggiatore', 'Altro'];
+const DOCS = ["Carta d'identità", 'Patente', 'Passaporto', 'Altro'];
+const staffPinHash = (id, pin) => sha(`mister-staff-pin:${id}:${pin}`);
+
+/** Crea (o aggiorna) la richiesta come accompagnatore collegata al profilo genitore: la approva il mister. */
+async function staffRequest(cfg, g, b, pin) {
+  const s = b.staff || {};
+  const id = g.staffId || 's-' + crypto.randomBytes(8).toString('hex');
+  const [old] = await pipeline(cfg, [['HGET', 'staff:list', id]]);
+  const prev = old ? JSON.parse(old) : null;
+  const now = Date.now();
+  const D = /^\d{4}-\d{2}-\d{2}$/;
+  const item = {
+    ...(prev || {}), id, parentId: g.id, firstName: g.firstName, lastName: g.lastName,
+    role: STAFF_ROLES.includes(s.role) ? s.role : prev?.role || 'Dirigente accompagnatore',
+    birthDate: g.birthDate || '', birthPlace: str(s.birthPlace, 60), taxCode: g.taxCode || '', address: g.address || '', phone: g.phone || '', email: g.email || '',
+    docType: DOCS.includes(s.docType) ? s.docType : DOCS[0], docNumber: str(s.docNumber, 30).toUpperCase(), docIssuedBy: str(s.docIssuedBy, 60),
+    docExpiry: D.test(String(s.docExpiry || '')) ? s.docExpiry : '', matricola: str(s.matricola, 30),
+    teams: prev?.teams || [], note: prev?.note || 'Richiesta dall\'area genitori',
+    status: prev && prev.status === 'ok' ? 'ok' : 'pending', createdAt: prev?.createdAt || now, updatedAt: now,
+  };
+  await pipeline(cfg, [['HSET', 'staff:list', id, JSON.stringify(item)], ['HSET', 'staff:pin', id, staffPinHash(id, String(pin))]]);
+  if (item.status === 'pending') {
+    await logActivity(cfg, { type: 'staff', name: `${g.firstName} ${g.lastName}`, role: item.role, staffId: id });
+    await notify(cfg, { mister: true }, { title: '🧑‍💼 Richiesta accompagnatore', body: `${g.firstName} ${g.lastName} chiede di essere ${item.role.toLowerCase()}`, url: './#/bacheca', tag: 'staff-' + id });
+  }
+  return item;
+}
 const { notify } = require('./_push.js');
 
 const GID = /^g-[0-9a-f]{16}$/;
@@ -49,10 +78,15 @@ async function auth(cfg, id, pin) {
 }
 
 /** Profilo con i nomi dei figli (dalla rosa pubblica). */
-async function withNames(req, g) {
+async function withNames(req, g, cfg) {
   const r = await roster(req);
+  let staff = null;
+  if (g.staffId && cfg) {
+    const [raw] = await pipeline(cfg, [['HGET', 'staff:list', g.staffId]]);
+    if (raw) { const s = JSON.parse(raw); staff = { status: s.status || 'ok', role: s.role, matricola: s.matricola, docType: s.docType, docNumber: s.docNumber, docExpiry: s.docExpiry, docIssuedBy: s.docIssuedBy, birthPlace: s.birthPlace }; }
+  }
   return {
-    ...g,
+    ...g, staff,
     children: (g.children || []).map((c) => ({ ...c, name: r.players[c.playerId]?.name || 'Giocatore', teamId: r.players[c.playerId]?.teamId || '', team: r.teams[r.players[c.playerId]?.teamId]?.name || '' })),
   };
 }
@@ -78,8 +112,10 @@ module.exports = async function handler(req, res) {
       if (!Number(taken)) return send(res, 409, { error: 'Questa email è già registrata: usa "Ho già un profilo".' });
       const now = Date.now();
       const g = { id, ...f, children: [], consent: { version: str(b.privacyVersion, 20), at: now, ip: ip(req) }, createdAt: now, updatedAt: now };
+      if (b.asStaff === true) g.staffId = 's-' + crypto.randomBytes(8).toString('hex');
       await pipeline(cfg, [['HSET', 'par:list', id, JSON.stringify(g)], ['HSET', 'par:pin', id, parPinHash(id, String(b.pin))]]);
-      return send(res, 200, { parent: await withNames(req, g) });
+      if (g.staffId) await staffRequest(cfg, g, b, b.pin);
+      return send(res, 200, { parent: await withNames(req, g, cfg) });
     }
 
     if (req.method === 'POST' && action === 'login') {
@@ -91,15 +127,23 @@ module.exports = async function handler(req, res) {
       if (!id) return send(res, 403, { error: 'Email o PIN errati.' });
       const a = await auth(cfg, id, b.pin);
       if (a.error) return send(res, a.status, { error: a.error });
-      return send(res, 200, { parent: await withNames(req, a.g) });
+      return send(res, 200, { parent: await withNames(req, a.g, cfg) });
     }
 
-    if (req.method === 'POST' && ['me', 'update', 'link', 'unlink', 'erase'].includes(action)) {
+    if (req.method === 'POST' && ['me', 'update', 'link', 'unlink', 'erase', 'staff'].includes(action)) {
       const b = await readBody(req);
       const a = await auth(cfg, b.id, b.pin);
       if (a.error) return send(res, a.status, { error: a.error });
       const g = a.g;
-      if (action === 'me') return send(res, 200, { parent: await withNames(req, g) });
+      if (action === 'me') return send(res, 200, { parent: await withNames(req, g, cfg) });
+
+      if (action === 'staff') {
+        // diventa (o aggiorna i dati come) accompagnatore: serve l'approvazione del mister
+        const upd = { ...g, staffId: g.staffId || 's-' + crypto.randomBytes(8).toString('hex'), updatedAt: Date.now() };
+        await pipeline(cfg, [['HSET', 'par:list', g.id, JSON.stringify(upd)]]);
+        await staffRequest(cfg, upd, b, b.pin);
+        return send(res, 200, { parent: await withNames(req, upd, cfg) });
+      }
 
       if (action === 'update') {
         const f = fields(b, g);
@@ -115,7 +159,7 @@ module.exports = async function handler(req, res) {
         cmds.push(['HSET', 'par:list', g.id, JSON.stringify(upd)]);
         if (PIN.test(String(b.newPin || ''))) cmds.push(['HSET', 'par:pin', g.id, parPinHash(g.id, String(b.newPin))]);
         await pipeline(cfg, cmds);
-        return send(res, 200, { parent: await withNames(req, upd) });
+        return send(res, 200, { parent: await withNames(req, upd, cfg) });
       }
 
       if (action === 'link') {
@@ -135,15 +179,16 @@ module.exports = async function handler(req, res) {
         const upd = { ...g, children: [...children, { playerId: b.playerId, status, at: Date.now() }], updatedAt: Date.now() };
         await pipeline(cfg, [['HSET', 'par:list', g.id, JSON.stringify(upd)]]);
         if (status === 'pending') {
+          await logActivity(cfg, { type: 'genitore', name: `${g.firstName} ${g.lastName}`, player: r.players[b.playerId].name, parentId: g.id, playerId: b.playerId });
           await notify(cfg, { mister: true }, { title: '👨‍👩‍👧 Richiesta genitore', body: `${g.firstName} ${g.lastName} chiede di collegarsi a ${r.players[b.playerId].name}`, url: './#/genitori', tag: 'par-' + g.id });
         }
-        return send(res, 200, { parent: await withNames(req, upd), status });
+        return send(res, 200, { parent: await withNames(req, upd, cfg), status });
       }
 
       if (action === 'unlink') {
         const upd = { ...g, children: (g.children || []).filter((c) => c.playerId !== b.playerId), updatedAt: Date.now() };
         await pipeline(cfg, [['HSET', 'par:list', g.id, JSON.stringify(upd)]]);
-        return send(res, 200, { parent: await withNames(req, upd) });
+        return send(res, 200, { parent: await withNames(req, upd, cfg) });
       }
 
       if (action === 'erase') {
@@ -158,7 +203,7 @@ module.exports = async function handler(req, res) {
 
     if (req.method === 'GET' && action === 'list') {
       const [all] = await pipeline(cfg, [['HGETALL', 'par:list']]);
-      const items = await Promise.all(Object.values(hashToObj(all)).map((j) => withNames(req, JSON.parse(j))));
+      const items = await Promise.all(Object.values(hashToObj(all)).map((j) => withNames(req, JSON.parse(j), cfg)));
       items.sort((a, b) => `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`));
       return send(res, 200, { items });
     }

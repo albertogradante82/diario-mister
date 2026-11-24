@@ -55,6 +55,7 @@ module.exports = async function handler(req, res) {
       const [all, pins] = await pipeline(cfg, [['HGETALL', 'staff:list'], ['HKEYS', 'staff:pin']]);
       const hasPin = new Set(pins || []);
       const items = Object.values(hashToObj(all)).map((j) => JSON.parse(j))
+        .filter((s) => s.status !== 'pending')
         .map((s) => ({ id: s.id, name: `${s.firstName} ${s.lastName}`, role: s.role, teams: s.teams, cert: !!s.certifiedAt, hasPin: hasPin.has(s.id) }))
         .sort((a, b) => a.name.localeCompare(b.name));
       return send(res, 200, { items });
@@ -110,6 +111,23 @@ module.exports = async function handler(req, res) {
       delete item.hasPin;
       await pipeline(cfg, [['HSET', 'staff:list', id, JSON.stringify(item)]]);
       return send(res, 200, { item });
+    }
+
+    if (req.method === 'POST' && (action === 'approve' || action === 'reject')) {
+      const { id } = await readBody(req);
+      if (!SID.test(String(id))) return send(res, 400, { error: 'Id non valido.' });
+      const [raw] = await pipeline(cfg, [['HGET', 'staff:list', id]]);
+      if (!raw) return send(res, 404, { error: 'Richiesta non trovata.' });
+      const s = JSON.parse(raw);
+      if (action === 'reject') {
+        await pipeline(cfg, [['HDEL', 'staff:list', id], ['HDEL', 'staff:pin', id]]);
+        return send(res, 200, { ok: true });
+      }
+      // dati inseriti dalla persona stessa con il suo PIN: approvata = certificata
+      const now = Date.now();
+      const upd = { ...s, status: 'ok', approvedAt: now, certifiedAt: s.certifiedAt || (s.parentId ? now : undefined), updatedAt: now };
+      await pipeline(cfg, [['HSET', 'staff:list', id, JSON.stringify(upd)]]);
+      return send(res, 200, { item: upd });
     }
 
     if (req.method === 'POST' && action === 'resetpin') {

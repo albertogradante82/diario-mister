@@ -31,7 +31,10 @@ async function req(action, body, admin) {
 }
 const call = (action, body) => req(action, body, true);
 
-export const listStaff = async () => (await call('list')).items || [];
+export const listAllStaff = async () => (await call('list')).items || [];
+/** Solo i profili approvati (quelli in attesa non si possono convocare). */
+export const listStaff = async () => (await listAllStaff()).filter((s) => s.status !== 'pending');
+export const approveStaff = (id, ok) => call(ok ? 'approve' : 'reject', { id });
 export const publicStaff = async () => (await req('public')).items || [];
 export const staffName = (s) => `${s.firstName} ${s.lastName}`;
 /** Identificativo per la distinta: matricola, altrimenti documento. */
@@ -42,13 +45,15 @@ export const staffIdent = (s) => (s.matricola ? `matr. ${s.matricola}` : s.docNu
 export async function staffView(root) {
   setHeader({ title: 'Staff e accompagnatori', back: '#/home', actions: '<button class="hdr-btn" id="newst" aria-label="Nuovo">＋</button>' });
   let items, teams;
-  try { [items, teams] = await Promise.all([listStaff(), db.all('teams')]); } catch (e) {
+  let pending;
+  try { [items, teams] = await Promise.all([listAllStaff(), db.all('teams')]); pending = items.filter((s) => s.status === 'pending'); items = items.filter((s) => s.status !== 'pending'); } catch (e) {
     root.innerHTML = `<div class="empty"><div class="empty-icon">🔒</div><p>${esc(e.message)}</p></div>`; return;
   }
   const tname = Object.fromEntries(teams.map((t) => [t.id, t.name]));
   const today = new Date().toISOString().slice(0, 10);
   const nCert = items.filter((s) => s.certifiedAt).length;
   root.innerHTML = `
+    ${pending.length ? `<h2 class="section">⏳ Richieste da approvare · ${pending.length}</h2><div class="list">${pending.map((s) => staffReqRow(s)).join('')}</div>` : ''}
     <button class="btn primary block mb" id="add">➕ Nuovo mister / accompagnatore</button>
     ${items.length ? `<p class="small muted mb">${STAR} ${nCert} su ${items.length} profili certificati dalla persona con il suo PIN.</p>
     <div class="list">${items.map((s) => `
@@ -65,10 +70,26 @@ export async function staffView(root) {
       <button class="btn block mt" id="selfme">Certifica la mia scheda (con il mio PIN)</button></div>
     <p class="small muted mt">🔒 Documento, matricola e contatti li vede solo chi entra come mister con la password. Nelle convocazioni i ragazzi vedono solo nome e ruolo.</p>`;
   const open = async (s) => { if (await editStaff(s, teams)) route(); };
+  bindStaffReq(root);
   $('#add', root).onclick = () => open(null);
   $('#newst').onclick = () => open(null);
   $('#selfme', root).onclick = async () => { if (await selfStaffFlow()) route(); };
   $$('[data-s]', root).forEach((b) => (b.onclick = () => open(items.find((x) => x.id === b.dataset.s))));
+}
+
+export function staffReqRow(s) {
+  return `<div class="item"><span class="avatar staff-av">${ICON[s.role] || '👤'}</span>
+    <div class="grow"><strong>${esc(s.name || staffName(s))}</strong> <span class="muted small">· ${esc(s.role)}</span>
+      <div class="small">${s.matricola ? `🪪 Matricola <b>${esc(s.matricola)}</b>` : ''}${s.matricola && s.docNumber ? ' · ' : ''}${s.docNumber ? `📄 ${esc(s.docType || '')} <b>${esc(s.docNumber)}</b>` : ''}</div>
+      <div class="muted small">Registrato come genitore${s.phone ? ' · ' + esc(s.phone) : ''}${s.email ? ' · ' + esc(s.email) : ''}</div>
+      <div class="row gap mt"><button class="btn small primary" data-sok="${s.id}">✓ Approva</button><button class="btn small danger" data-sno="${s.id}">Rifiuta</button></div></div></div>`;
+}
+export function bindStaffReq(root) {
+  $$('[data-sok]', root).forEach((b) => (b.onclick = async () => { try { await approveStaff(b.dataset.sok, true); toast('Accompagnatore approvato ✓'); route(); } catch (e) { toast(e.message, 4000); } }));
+  $$('[data-sno]', root).forEach((b) => (b.onclick = async () => {
+    if (!(await confirmDialog('Rifiutare la richiesta come accompagnatore?', 'Rifiuta', true))) return;
+    try { await approveStaff(b.dataset.sno, false); toast('Richiesta rifiutata'); route(); } catch (e) { toast(e.message, 4000); }
+  }));
 }
 
 function fieldsHtml(s, { admin, teams }) {

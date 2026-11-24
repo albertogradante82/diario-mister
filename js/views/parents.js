@@ -8,6 +8,22 @@ import { me, parent, setParent, setChild, logoutParent, call } from '../family.j
 
 const API = './api/genitori';
 const RELATIONS = ['Madre', 'Padre', 'Tutore', 'Altro'];
+const STAFF_ROLES = ['Dirigente accompagnatore', 'Allenatore', 'Allenatore in seconda', 'Preparatore dei portieri', 'Preparatore atletico', 'Medico / massaggiatore', 'Altro'];
+const DOCS = ["Carta d'identità", 'Patente', 'Passaporto', 'Altro'];
+
+function staffFields(s = {}) {
+  const v = (k) => esc(s[k] || '');
+  return `
+    <label>Ruolo<select name="s_role">${STAFF_ROLES.map((r) => `<option ${r === s.role ? 'selected' : ''}>${r}</option>`).join('')}</select></label>
+    <label>Luogo di nascita<input name="s_birthPlace" maxlength="60" value="${v('birthPlace')}"></label>
+    <label>Numero matricola (FIGC)<input name="s_matricola" maxlength="30" inputmode="numeric" value="${v('matricola')}"></label>
+    <div class="row gap"><label class="grow">Documento<select name="s_docType">${DOCS.map((d) => `<option ${d === s.docType ? 'selected' : ''}>${esc(d)}</option>`).join('')}</select></label>
+      <label class="grow">Numero documento<input name="s_docNumber" maxlength="30" autocapitalize="characters" value="${v('docNumber')}"></label></div>
+    <div class="row gap"><label class="grow">Rilasciato da<input name="s_docIssuedBy" maxlength="60" value="${v('docIssuedBy')}"></label>
+      <label class="grow">Scadenza<input type="date" name="s_docExpiry" value="${v('docExpiry')}"></label></div>
+    <p class="small muted">Serve almeno la matricola o il numero del documento. La richiesta la approva il mister.</p>`;
+}
+const readStaff = (f) => Object.fromEntries(['role', 'birthPlace', 'matricola', 'docType', 'docNumber', 'docIssuedBy', 'docExpiry'].map((k) => [k, String(new FormData(f).get('s_' + k) || '').trim()]));
 
 function formFields(g = {}) {
   const v = (k) => esc(g[k] || '');
@@ -38,6 +54,10 @@ export async function parentAreaView(root) {
     <div class="card row gap center"><span class="avatar" style="font-size:22px">👨‍👩‍👧</span>
       <div class="grow"><strong>${esc(g.firstName)} ${esc(g.lastName)}</strong><div class="muted small">${esc(g.relation)} · ${esc(g.email)}</div></div>
       <button class="btn-text small" id="edit">Modifica</button></div>
+    <div class="card small">${g.staff
+      ? `🧑‍💼 <strong>Accompagnatore</strong> · ${esc(g.staff.role)} — ${g.staff.status === 'ok' ? '<span class="ok">✓ approvato dal mister</span>' : '<span class="warn">⏳ in attesa di approvazione del mister</span>'}
+         <button class="btn-text small" id="staffreq">Aggiorna dati</button>`
+      : `🧑‍💼 Sei anche accompagnatore o dirigente? <button class="btn-text small" id="staffreq">Chiedi di esserlo</button>`}</div>
     <h2 class="section">I miei figli</h2>
     ${g.children.length ? `<div class="list">${g.children.map((c) => `
       <div class="item ${cur && cur.parent && cur.id === c.playerId ? 'item-on' : ''}">
@@ -68,6 +88,19 @@ export async function parentAreaView(root) {
     try { setParent((await call(`${API}?action=unlink`, { id: p.id, pin: p.pin, playerId: c.playerId })).parent, p.pin); route(); } catch (e) { toast(e.message, 4000); }
   }));
   $('#link', root).onclick = async () => { if (await linkChild(p)) route(); };
+  $('#staffreq', root).onclick = async () => {
+    const ok = await sheet('🧑‍💼 Accompagnatore', (body, close) => {
+      body.innerHTML = `<form class="form" id="sf"><p class="small muted">Usiamo i dati del tuo profilo genitore (nome, nascita, codice fiscale, contatti). Aggiungi questi:</p>${staffFields(g.staff || {})}
+        <button class="btn primary block mt">${g.staff ? 'Salva' : 'Invia la richiesta al mister'}</button></form>`;
+      body.querySelector('#sf').onsubmit = async (e) => {
+        e.preventDefault();
+        const st = readStaff(e.target);
+        if (!st.matricola && !st.docNumber) { toast('Inserisci la matricola o il numero del documento.'); return; }
+        try { setParent((await call(`${API}?action=staff`, { id: p.id, pin: p.pin, staff: st })).parent, p.pin); toast(g.staff ? 'Dati aggiornati ✓' : 'Richiesta inviata al mister ⏳', 3500); close(true); } catch (err) { toast(err.message, 4000); }
+      };
+    });
+    if (ok) route();
+  };
   $('#edit', root).onclick = async () => { if (await editParent(p, g)) route(); };
   $('#out', root).onclick = () => { logoutParent(); toast('Uscito dall\'area genitori'); route(); };
   $('#erase', root).onclick = async () => {
@@ -85,6 +118,8 @@ function loginOrRegister(root) {
       <label>🔑 PIN genitori della società<input name="clubPin" type="password" inputmode="numeric" maxlength="8" required class="code-input" autocomplete="off" value="${esc(localStorage.getItem('mister-clubpin') || '')}"></label>
       <p class="small muted">Te lo comunica il mister o la società.</p>
       ${formFields()}
+      <label class="consent-row staff-flag"><input type="checkbox" name="asStaff"><span>🧑‍💼 <strong>Sono anche accompagnatore / dirigente</strong> della società (la richiesta la approva il mister)</span></label>
+      <div id="staffbox" hidden>${staffFields()}</div>
       <label>Scegli un PIN di 4-6 cifre<input name="pin" type="password" inputmode="numeric" pattern="[0-9]{4,6}" maxlength="6" required class="code-input" autocomplete="off"></label>
       <p class="small muted">Con email e PIN accedi anche da un altro telefono.</p>
       <div class="consent-box"><label class="consent-row"><input type="checkbox" name="consent" required>
@@ -98,15 +133,18 @@ function loginOrRegister(root) {
       <p class="small muted">PIN dimenticato? Chiedi al mister di impostarne uno nuovo.</p></form>`;
   $$('input[name=m]', root).forEach((i) => (i.onchange = () => { $('#reg', root).hidden = i.value !== 'reg'; $('#log', root).hidden = i.value !== 'log'; }));
   $$('.openPrivacy', root).forEach((a) => (a.onclick = (e) => { e.preventDefault(); showPrivacy(); }));
+  $('#reg', root).asStaff.onchange = (e) => { $('#staffbox', root).hidden = !e.target.checked; };
   $('#reg', root).onsubmit = async (e) => {
     e.preventDefault();
     const f = e.target, pin = f.pin.value;
     if (!f.consent.checked) { toast('Devi accettare l\'informativa privacy.'); return; }
+    const asStaff = f.asStaff.checked, staff = asStaff ? readStaff(f) : null;
+    if (asStaff && !staff.matricola && !staff.docNumber) { toast('Come accompagnatore serve la matricola o il numero del documento.', 3500); return; }
     try {
-      const { parent: g } = await call(`${API}?action=register`, { ...readFields(f), pin, clubPin: f.clubPin.value, consent: true, privacyVersion: PRIVACY_VERSION });
+      const { parent: g } = await call(`${API}?action=register`, { ...readFields(f), pin, clubPin: f.clubPin.value, consent: true, privacyVersion: PRIVACY_VERSION, asStaff, staff });
       localStorage.setItem('mister-clubpin', f.clubPin.value);
       setParent(g, pin);
-      toast('Registrazione completata ✓ Ora collega tuo figlio');
+      toast(asStaff ? 'Registrazione completata ✓ La richiesta come accompagnatore è stata inviata al mister' : 'Registrazione completata ✓ Ora collega tuo figlio', 4000);
       route();
       setTimeout(() => linkChild(parent()).then((x) => x && route()), 400);
     } catch (err) { toast(err.message, 4500); }
@@ -190,6 +228,7 @@ export async function misterParentsView(root) {
         <div class="small mt">📞 ${esc(g.phone || '—')} · ✉️ ${esc(g.email)}</div>
         <div class="small">🪪 ${esc(g.taxCode || '—')}${g.birthDate ? ' · nato/a il ' + esc(g.birthDate.split('-').reverse().join('/')) : ''}</div>
         <div class="small">🏠 ${esc(g.address || '—')}</div>
+        ${g.staff ? `<div class="small">🧑‍💼 Accompagnatore (${esc(g.staff.role)}) — ${g.staff.status === 'ok' ? '✓ approvato' : '⏳ da approvare'}</div>` : ''}
         <div class="small mt">${g.children.map((c) => `${c.status === 'ok' ? '✓' : '⏳'} ${esc(c.name)} (${esc(c.team)})`).join('<br>') || 'Nessun figlio collegato'}</div>
         <div class="row gap mt"><button class="btn small" data-pin="${g.id}">🔑 Nuovo PIN</button><button class="btn small danger" data-del="${g.id}">Elimina</button></div>
       </details>`).join('')}</div>` : '<div class="empty"><div class="empty-icon">👨‍👩‍👧</div><p>Nessun genitore registrato.</p><p class="small">I genitori si registrano dall\'app: Altro → Area genitori.</p></div>'}

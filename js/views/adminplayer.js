@@ -6,7 +6,7 @@ import { docRow, bindDocRows, KINDS } from './docs.js';
 import { payStatus } from './payments.js';
 import { isSuperMode } from '../admin.js';
 
-const RLABEL = { unica: 'Rata unica', r1: '1ª rata', r2: '2ª rata' };
+const RLABEL = new Proxy({}, { get: (_, k) => (k === 'unica' ? 'Rata unica' : `${String(k).slice(1)}ª rata`) });
 let cache = null, cacheAt = 0;
 
 /** Documenti e pagamenti di tutti (una richiesta, valida 30 s). */

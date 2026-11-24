@@ -533,3 +533,4 @@ pre.fatt { white-space: pre-wrap; font: inherit; font-size: 13.5px; background: 
 .roster-adm { display: flex; gap: 6px; justify-content: center; font-size: 12px; min-height: 16px; margin-top: 2px; }
 .roster-adm .muted { opacity: .35; filter: grayscale(1); } .roster-adm .ko { filter: drop-shadow(0 0 2px var(--ko)); } .roster-adm span:last-child { font-weight: 800; }
 .admin-on { border: 2px solid var(--ok); margin-bottom: 8px; }
+.bank-card h3 { margin: 0 0 8px; } .iban { font-family: ui-monospace, Menlo, monospace; font-size: 17px; font-weight: 700; letter-spacing: .5px; word-break: break-all; }

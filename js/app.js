@@ -15,7 +15,7 @@ import { videoListView } from './views/video.js';
 import { staffView, playerStaffView } from './views/staff.js';
 import { parentAreaView, misterParentsView } from './views/parents.js';
 import { playerDocsView, misterDocsView } from './views/docs.js';
-import { playerPaymentsView, misterPaymentsView } from './views/payments.js';
+import { playerPaymentsView, misterPaymentsView, bankView } from './views/payments.js';
 import { reportView, playerReportsView } from './views/report.js';
 import { playerCalendarView, playerRosterView, playerScorersView, playerProfileView, playerProfileEditView, playerMoreView } from './views/player.js';
 import { roleChoiceView, autoUpdateClubData } from './views/more.js';
@@ -147,6 +147,7 @@ const playerRoutes = [
   [/^#\/g\/tabellino\/([^/]+)$/, reportView(false), 'g-conv'],
   [/^#\/g\/documenti$/, playerDocsView, 'g-altro'],
   [/^#\/g\/pagamenti$/, playerPaymentsView, 'g-altro'],
+  [/^#\/g\/datipagamento$/, bankView, 'g-altro'],
   [/^#\/g\/rose$/, playerRosterView, 'g-altro'],
   [/^#\/g\/marcatori$/, playerScorersView, 'g-altro'],
   [/^#\/g\/giocatore\/([^/]+)\/modifica$/, playerProfileEditView, 'g-altro'],
@@ -251,7 +252,7 @@ function setTab(tab) {
 
 // ---------- Avvio ----------
 
-export const APP_VERSION = '1.28.1';
+export const APP_VERSION = '1.29.0';
 let swReg = null;
 
 /** Controlla subito se c'è una versione nuova dell'app; restituisce true se è stata trovata. */

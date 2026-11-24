@@ -312,6 +312,7 @@ export async function playerMoreView(root) {
   root.innerHTML = `<div class="list">
     <a class="item" href="#/g/genitore"><span style="font-size:24px">👨‍👩‍👧</span><div class="grow"><strong>Area genitori</strong><div class="muted small">Registrati e collegati ai tuoi figli</div></div><span class="chev">›</span></a>
     <a class="item" href="#/g/documenti"><span style="font-size:24px">📄</span><div class="grow"><strong>Documenti</strong><div class="muted small">Documento d'identità, certificato medico, altri</div></div><span class="chev">›</span></a>
+    <a class="item" href="#/g/datipagamento"><span style="font-size:24px">🏦</span><div class="grow"><strong>Dati per pagamento</strong><div class="muted small">IBAN, intestatario, causale e importi</div></div><span class="chev">›</span></a>
     <a class="item" href="#/g/pagamenti"><span style="font-size:24px">💶</span><div class="grow"><strong>Pagamenti e fattura</strong><div class="muted small">Quota, rate, ricevute, richiesta fattura</div></div><span class="chev">›</span></a>
     <a class="item" href="#/g/rose"><span style="font-size:24px">👥</span><div class="grow"><strong>Squadre e schede giocatori</strong><div class="muted small">Rose con foto · compila la tua scheda</div></div><span class="chev">›</span></a>
     <a class="item" href="#/g/marcatori"><span style="font-size:24px">🏆</span><div class="grow"><strong>Classifiche e marcatori</strong><div class="muted small">Campionati e classifica di tutte le giovanili</div></div><span class="chev">›</span></a>

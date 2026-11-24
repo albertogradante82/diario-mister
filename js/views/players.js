@@ -29,8 +29,20 @@ export async function rosterView(root) {
         return `<a class="roster-card" href="#/giocatore/${p.id}"><div class="roster-photo" data-ph="${p.id}">${p.photo ? `<img src="${esc(p.photo)}" alt="">` : esc(p.number !== '' && p.number != null ? p.number : ((p.firstName || '')[0] || '') + ((p.lastName || '')[0] || ''))}</div>
           ${p.number !== '' && p.number != null ? `<span class="roster-num">${esc(p.number)}</span>` : ''}${profs[p.id] ? '<span class="roster-ok" title="Profilo certificato">★</span>' : ''}
           <div class="roster-name">${esc(fullName(p))}</div>
-          <div class="roster-sub">${tc ? `⚽ ${tc.gol} · 🅰️ ${tc.assist}` : '&nbsp;'}</div></a>`;
+          <div class="roster-sub">${tc ? `⚽ ${tc.gol} · 🅰️ ${tc.assist}` : '&nbsp;'}</div><div class="roster-adm" data-adm="${p.id}"></div></a>`;
       }).join('')}</div>`).join('')}`;
+  // documenti e pagamenti (solo mister con password): icone sotto il nome
+  import('./adminplayer.js').then(async (m) => {
+    const d = await m.adminData().catch(() => null);
+    if (!d) return;
+    root.querySelectorAll('[data-adm]').forEach((el) => {
+      const pl = ctx.players.find((x) => x.id === el.dataset.adm);
+      if (!pl) return;
+      const q = m.quickStatus(d, pl);
+      el.innerHTML = `<span class="${q.id ? 'ok' : 'muted'}" title="Documento">🪪</span><span class="${q.cert === 'ok' ? 'ok' : q.cert === 'scaduto' ? 'ko' : 'muted'}" title="Certificato medico">🩺</span>`
+        + `<span class="${q.pay === 'ok' || q.pay === 'esente' ? 'ok' : q.pay === 'scaduto' ? 'ko' : 'muted'}" title="Pagamenti">${q.pay === 'esente' ? '—' : '€'}</span>`;
+    });
+  });
   // foto inviate dai ragazzi per chi non ha ancora la foto nel profilo
   root.querySelectorAll('[data-ph]').forEach(async (el) => {
     const pl = ctx.players.find((x) => x.id === el.dataset.ph);
@@ -97,6 +109,7 @@ export async function playerView(root, id) {
     ${tcLines.length > 1 ? `<div class="card small">${tcLines.map((l) => `<div>${esc(l.team)}: <strong>${l.gol}</strong> gol${l.rigori ? ` (${l.rigori} rig.)` : ''}, <strong>${l.assist}</strong> assist</div>`).join('')}</div>` : ''}
     <p class="small muted">Aggiornate al ${esc(fmtDate(tcLines[0]?.aggiornato || team?.tcStats?.aggiornato))}. ${team?.tcStats?.posizione ? '' : ''}</p>` : team?.tcStats ? `<div class="card small">📊 Nessun gol o assist ufficiale in stagione (Tuttocampo, al ${esc(fmtDate(team.tcStats.aggiornato))}).</div>` : ''}
 
+    <div id="adminbox"></div>
     <div id="repstats"></div>
     ${tot.presenze ? `<h2 class="section">Statistiche registrate dal mister</h2>
     <div class="tiles">
@@ -142,6 +155,7 @@ export async function playerView(root, id) {
     <button class="btn primary block mt" data-action="pdf">📄 Esporta scheda PDF</button>`;
   showRemoteProfile(root.querySelector('#remote'), p);
   import('./report.js').then((m) => m.reportStatsCard(root.querySelector('#repstats'), p.id));
+  import('./adminplayer.js').then((m) => m.adminPlayerCard(root.querySelector('#adminbox'), p));
   if (!p.photo) getPhoto(p.id).then((ph) => { const a = root.querySelector('.profile .avatar'); if (ph && a) { const star = a.querySelector('.vstar'); a.innerHTML = `<img src="${ph}" alt="">`; if (star) a.appendChild(star); } });
 
   const drawChart = () => {

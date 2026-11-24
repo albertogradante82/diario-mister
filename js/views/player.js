@@ -201,9 +201,11 @@ export async function playerProfileView(root, id) {
         <div class="tile"><div class="tile-v">${gol + ast}</div><div class="tile-l">Gol + assist</div></div>
       </div>
       ${official.length > 1 ? `<div class="card small">${official.map((m) => `<div>${esc(m.team)}: ${m.gol} gol, ${m.assist} assist</div>`).join('')}</div>` : ''}
+      <div id="repstats"></div>
       <a class="btn primary block mt" href="#/g/giocatore/${id}/modifica">${pr.updatedAt ? '✏️ Modifica la mia scheda' : '✏️ È la mia scheda: compilala'}</a>
       ${pr.updatedAt ? '<button class="btn block mt" id="mypdf">📄 Scarica la mia scheda PDF (serve il PIN)</button>' : ''}
       <p class="small muted mt">Foto e data di nascita sono visibili a tutti nell'app. Cellulare ed email li vede solo la società.</p>`;
+    import('./report.js').then((m) => m.reportStatsCard(root.querySelector('#repstats'), id));
     const btn = root.querySelector('#mypdf');
     if (btn) btn.onclick = () => downloadMyPdf(d, f, pr, photo);
   });

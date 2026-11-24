@@ -312,6 +312,7 @@ const ACT = {
   ricevuta: ['💶', (a) => `<strong>${esc(a.player)}</strong>: ricevuta di pagamento <em>${esc(a.name)}</em>`, '#/pagamenti'],
   fattura: ['🧾', (a) => `<strong>${esc(a.player)}</strong>: richiesta fattura intestata a <em>${esc(a.name)}</em>`, '#/pagamenti'],
   genitore: ['👨‍👩‍👧', (a) => `<strong>${esc(a.name)}</strong> chiede di collegarsi a ${esc(a.player)}`, '#/genitori'],
+  tabellino: ['📊', (a) => `<strong>${esc(a.by)}</strong> ha compilato il tabellino di <em>${esc(a.name)}</em>`, '#/convocazioni'],
   staff: ['🧑‍💼', (a) => `<strong>${esc(a.name)}</strong> chiede di essere ${esc((a.role || 'accompagnatore').toLowerCase())}`, '#/staff'],
 };
 

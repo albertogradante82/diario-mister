@@ -208,6 +208,7 @@ export async function matchView(root, id) {
       <div class="mh-score">${scoreLabel(m, s)}</div>
       <div class="muted small">${esc(m.status)} · ${n} ${n === 1 ? 'tempo' : 'tempi'} da ${m.periodMinutes}′</div>
       ${m.status !== 'finita' ? '<button class="btn block mt" id="spost">📅 Cambia data e ora</button>' : ''}
+      <button class="btn block mt" id="tabellino">📊 Tabellino e minutaggio</button>
       <button class="btn block mt" id="convoca">📋 Convoca i ragazzi (rispondono dall'app)</button>
       <a class="btn primary block mt" href="#/partita/${id}/live">${m.status === 'finita' ? '✏️ Apri tagging eventi' : m.status === 'in corso' ? '▶ Continua live' : '▶ Avvia live'}</a>
     </div>
@@ -281,6 +282,24 @@ export async function matchView(root, id) {
 
   videoCard($('#videoBox', root), m);
   if ($('#spost', root)) $('#spost', root).onclick = async () => { if (await moveMatchSheet(m, matchTitle(m, ctx.team))) route(); };
+  $('#tabellino', root).onclick = async () => {
+    // il tabellino vive nella convocazione: se la partita non ne ha una (es. partite vecchie) la creo chiusa
+    const code = await db.getMeta('clubCode');
+    if (!code) { toast('Rientra come mister con la password.', 4000); return; }
+    try {
+      const list = (await (await fetch('./api/convocazioni?action=list', { cache: 'no-store' })).json()).items || [];
+      let c = list.find((x) => x.matchId === m.id);
+      if (!c) {
+        const players = ctx.players.map((p) => p.id);
+        const r = await fetch('./api/convocazioni?action=save', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-admin-code': code },
+          body: JSON.stringify({ kind: 'partita', teamId: m.teamId, matchId: m.id, title: matchTitle(m, ctx.team), date: m.date, time: m.time || '', place: m.place || '', players, closed: m.date < today(), notify: false }) });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || 'Errore');
+        c = d.item;
+      }
+      location.hash = `#/tabellino/${c.id}`;
+    } catch (e) { toast(e.message, 4000); }
+  };
   $('#convoca', root).onclick = () => editConvocation(null, { code: null, match: m, kind: 'partita' });
   $$('#tabs button', root).forEach((b) => (b.onclick = () => {
     sessionStorage.setItem('matchTab', b.dataset.tab);

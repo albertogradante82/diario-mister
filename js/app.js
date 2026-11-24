@@ -15,6 +15,7 @@ import { staffView, playerStaffView } from './views/staff.js';
 import { parentAreaView, misterParentsView } from './views/parents.js';
 import { playerDocsView, misterDocsView } from './views/docs.js';
 import { playerPaymentsView, misterPaymentsView } from './views/payments.js';
+import { reportView, playerReportsView } from './views/report.js';
 import { playerCalendarView, playerRosterView, playerScorersView, playerProfileView, playerProfileEditView, playerMoreView } from './views/player.js';
 import { roleChoiceView, autoUpdateClubData } from './views/more.js';
 import { getRole, logout } from './roles.js';
@@ -112,6 +113,7 @@ const routes = [
   [/^#\/video$/, videoListView, 'home'],
   [/^#\/staff$/, staffView, 'home'],
   [/^#\/genitori$/, misterParentsView, 'home'],
+  [/^#\/tabellino\/([^/]+)$/, reportView(true), 'home'],
   [/^#\/documenti$/, misterDocsView, 'home'],
   [/^#\/pagamenti$/, misterPaymentsView, 'home'],
   [/^#\/partita\/nuova$/, (r) => matchEditView(r, null), 'partite'],
@@ -140,6 +142,8 @@ const playerRoutes = [
   [/^#\/g\/calendario$/, playerCalendarView, 'g-cal'],
   [/^#\/g\/staff$/, playerStaffView, 'g-altro'],
   [/^#\/g\/genitore$/, parentAreaView, 'g-altro'],
+  [/^#\/g\/tabellini$/, playerReportsView, 'g-conv'],
+  [/^#\/g\/tabellino\/([^/]+)$/, reportView(false), 'g-conv'],
   [/^#\/g\/documenti$/, playerDocsView, 'g-altro'],
   [/^#\/g\/pagamenti$/, playerPaymentsView, 'g-altro'],
   [/^#\/g\/rose$/, playerRosterView, 'g-altro'],
@@ -246,7 +250,7 @@ function setTab(tab) {
 
 // ---------- Avvio ----------
 
-export const APP_VERSION = '1.25.0';
+export const APP_VERSION = '1.26.0';
 let swReg = null;
 
 /** Controlla subito se c'è una versione nuova dell'app; restituisce true se è stata trovata. */

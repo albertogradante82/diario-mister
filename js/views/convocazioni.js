@@ -73,7 +73,8 @@ export function playerConvView(kind) {
       var summary = kind === 'allenamento' && past.length ? `<div class="card small row gap center"><span style="font-size:26px">📊</span><div class="grow">Le tue presenze agli allenamenti: <strong>${pres}/${past.length}</strong> (${Math.round((pres / past.length) * 100)}%)</div></div>` : '';
     } catch (e) { root.innerHTML = `<div class="empty"><p>${esc(e.message)}</p></div>`; return; }
 
-    root.innerHTML = `${summary}
+    const tabLink = kind === 'partita' ? '<a class="btn block mb" href="#/g/tabellini">📊 Tabellini e minutaggio delle partite giocate</a>' : '';
+    root.innerHTML = `${tabLink}${summary}
       ${items.length ? items.map((c) => {
         const r = mine[c.id];
         const state = r ? (r.r === 'si' ? 'si' : 'no') : 'wait';
@@ -203,6 +204,7 @@ function convCard(c, r, byId, teams, kind) {
     </details>
     <div class="row gap mt" style="flex-wrap:wrap">
       ${c.matchId ? '<button class="btn small grow" data-capply="' + c.id + '">Usa i presenti come convocati</button>' : ''}
+      ${kind !== 'allenamento' ? `<a class="btn small primary" href="#/tabellino/${c.id}">📊 Tabellino</a>` : ''}
       <button class="btn small" data-cedit="${c.id}">Modifica</button>
       <button class="btn small" data-cclose="${c.id}">${c.closed ? 'Riapri' : 'Chiudi risposte'}</button>
       <button class="btn small danger" data-cdel="${c.id}">Elimina</button>

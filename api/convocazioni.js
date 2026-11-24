@@ -4,7 +4,7 @@
 //   conv:list        hash convId -> JSON convocazione
 //   conv:resp:<id>   hash playerId -> JSON { r: 'si'|'no', note, at }
 const crypto = require('crypto');
-const { redisConfig, pipeline, isAdmin, ip, send, readBody, limited, hashToObj, authPlayer } = require('./_lib.js');
+const { redisConfig, pipeline, isAdmin, ip, send, readBody, limited, hashToObj, authPlayer, roster, logActivity } = require('./_lib.js');
 const { notify, quando } = require('./_push.js');
 
 const PID = /^imp-[0-9a-f]{16}$/;
@@ -14,6 +14,30 @@ const str = (v, max) => String(v ?? '').trim().slice(0, max);
 async function checkPin(cfg, playerId, pin) {
   const a = await authPlayer(cfg, playerId, pin);
   return a.error || null;
+}
+
+
+// ---------- Tabellino partita: titolari, cambi (tempo e minuto), eventi ----------
+// Redis: tab:list  hash chiave (matchId o convId) -> JSON tabellino
+const EV_TYPES = ['gol', 'assist', 'palo', 'traversa', 'infortunio', 'autogol', 'ammonizione', 'espulsione', 'rigoreSbagliato', 'parata'];
+function cleanReport(b, prev) {
+  const ids = (a, n) => (Array.isArray(a) ? [...new Set(a.filter((x) => PID.test(String(x))))].slice(0, n) : []);
+  const half = (h) => (Number(h) === 2 ? 2 : Number(h) === 3 ? 3 : 1);
+  const halfLen = Math.min(60, Math.max(10, Math.round(Number(b.halfLen) || prev?.halfLen || 35)));
+  const minute = (m) => Math.min(halfLen + 15, Math.max(0, Math.round(Number(m) || 0)));
+  return {
+    halves: Number(b.halves) === 3 ? 3 : Number(b.halves) === 1 ? 1 : 2,
+    halfLen,
+    starters: ids(b.starters, 11),
+    squad: ids(b.squad, 40),
+    subs: (Array.isArray(b.subs) ? b.subs : []).slice(0, 40)
+      .filter((x) => PID.test(String(x.in)) || PID.test(String(x.out)))
+      .map((x) => ({ half: half(x.half), min: minute(x.min), in: PID.test(String(x.in)) ? x.in : '', out: PID.test(String(x.out)) ? x.out : '' })),
+    events: (Array.isArray(b.events) ? b.events : []).slice(0, 80).filter((x) => EV_TYPES.includes(x.type))
+      .map((x) => ({ type: x.type, half: half(x.half), min: minute(x.min), playerId: PID.test(String(x.playerId)) ? x.playerId : '', assistId: x.type === 'gol' && PID.test(String(x.assistId)) ? x.assistId : '', note: str(x.note, 80) })),
+    goalsAgainst: Math.min(99, Math.max(0, Math.round(Number(b.goalsAgainst) || 0))),
+    note: str(b.note, 400),
+  };
 }
 
 module.exports = async function handler(req, res) {
@@ -26,6 +50,44 @@ module.exports = async function handler(req, res) {
       const [all] = await pipeline(cfg, [['HGETALL', 'conv:list']]);
       const items = Object.values(hashToObj(all)).map((j) => JSON.parse(j)).sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
       return send(res, 200, { items });
+    }
+
+    if (req.method === 'GET' && action === 'reports') {
+      const [all] = await pipeline(cfg, [['HGETALL', 'tab:list']]);
+      return send(res, 200, { reports: Object.fromEntries(Object.entries(hashToObj(all)).map(([k, v]) => [k, JSON.parse(v)])) });
+    }
+
+    if (req.method === 'POST' && action === 'report') {
+      // tabellino: lo compila il mister, oppure un giocatore registrato della squadra (a partita conclusa)
+      const b = await readBody(req);
+      const admin = isAdmin(req);
+      const [rawC] = await pipeline(cfg, [['HGET', 'conv:list', String(b.convId || '')]]);
+      if (!rawC) return send(res, 404, { error: 'Convocazione non trovata.' });
+      const c = JSON.parse(rawC);
+      if (c.kind === 'allenamento') return send(res, 400, { error: 'Il tabellino è solo per le partite.' });
+      const key = c.matchId || c.id;
+      const [rawT] = await pipeline(cfg, [['HGET', 'tab:list', key]]);
+      const prev = rawT ? JSON.parse(rawT) : null;
+      let by = 'mister';
+      if (!admin) {
+        if (await limited(cfg, `rl:tab:${ip(req)}`, 60, 3600)) return send(res, 429, { error: 'Troppe modifiche, riprova più tardi.' });
+        const a = await authPlayer(cfg, b.playerId, b.pin);
+        if (a.error) return send(res, a.status, { error: a.error });
+        if (a.who.role !== 'giocatore') return send(res, 403, { error: 'Il tabellino lo compilano il mister o i giocatori registrati.' });
+        const r = await roster(req);
+        if (r.players[b.playerId]?.teamId !== c.teamId) return send(res, 403, { error: 'Puoi compilare solo i tabellini della tua squadra.' });
+        const today = new Date(Date.now() + 3600e3).toISOString().slice(0, 10);
+        if (c.date > today) return send(res, 400, { error: 'Il tabellino si compila a partita conclusa.' });
+        if (prev?.locked) return send(res, 403, { error: 'Tabellino confermato dal mister: non si può più modificare.' });
+        by = r.players[b.playerId]?.name || 'giocatore';
+      }
+      const item = {
+        key, convId: c.id, matchId: c.matchId || '', teamId: c.teamId, title: c.title, date: c.date,
+        ...cleanReport(b, prev), locked: admin ? !!b.locked : !!prev?.locked, by, updatedAt: Date.now(),
+      };
+      await pipeline(cfg, [['HSET', 'tab:list', key, JSON.stringify(item)]]);
+      if (!admin) await logActivity(cfg, { type: 'tabellino', name: c.title, by, convId: c.id });
+      return send(res, 200, { report: item });
     }
 
     if (req.method === 'POST' && (action === 'mine' || action === 'respond')) {

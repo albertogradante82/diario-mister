@@ -97,6 +97,7 @@ export async function playerView(root, id) {
     ${tcLines.length > 1 ? `<div class="card small">${tcLines.map((l) => `<div>${esc(l.team)}: <strong>${l.gol}</strong> gol${l.rigori ? ` (${l.rigori} rig.)` : ''}, <strong>${l.assist}</strong> assist</div>`).join('')}</div>` : ''}
     <p class="small muted">Aggiornate al ${esc(fmtDate(tcLines[0]?.aggiornato || team?.tcStats?.aggiornato))}. ${team?.tcStats?.posizione ? '' : ''}</p>` : team?.tcStats ? `<div class="card small">📊 Nessun gol o assist ufficiale in stagione (Tuttocampo, al ${esc(fmtDate(team.tcStats.aggiornato))}).</div>` : ''}
 
+    <div id="repstats"></div>
     ${tot.presenze ? `<h2 class="section">Statistiche registrate dal mister</h2>
     <div class="tiles">
       ${tile('Presenze', tot.presenze)}${tile('Titolare', tot.titolare)}${tile('Minuti', Math.round(tot.minuti))}
@@ -140,6 +141,7 @@ export async function playerView(root, id) {
     <div id="remote"></div>
     <button class="btn primary block mt" data-action="pdf">📄 Esporta scheda PDF</button>`;
   showRemoteProfile(root.querySelector('#remote'), p);
+  import('./report.js').then((m) => m.reportStatsCard(root.querySelector('#repstats'), p.id));
   if (!p.photo) getPhoto(p.id).then((ph) => { const a = root.querySelector('.profile .avatar'); if (ph && a) { const star = a.querySelector('.vstar'); a.innerHTML = `<img src="${ph}" alt="">`; if (star) a.appendChild(star); } });
 
   const drawChart = () => {

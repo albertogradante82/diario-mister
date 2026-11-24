@@ -266,7 +266,7 @@ input[type=checkbox] { width: auto; appearance: auto; -webkit-appearance: checkb
 .num-btn { border: 2px solid transparent; background: var(--bg); color: var(--text); border-radius: 12px; padding: 10px 4px; font: inherit; display: flex; flex-direction: column; align-items: center; cursor: pointer; }
 .num-btn b { font-size: 20px; }
 .num-btn small { font-size: 11px; color: var(--muted); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.num-btn.on { border-color: var(--accent); background: var(--accent-soft); }
+.num-btn.on { border-color: var(--accent); background: var(--accent); color: #fff; }
 
 /* Toast */
 .toast {
@@ -524,3 +524,9 @@ pre.fatt { white-space: pre-wrap; font: inherit; font-size: 13.5px; background: 
 .staff-flag { margin: 6px 0; padding: 10px; border-radius: 12px; background: color-mix(in srgb, var(--accent) 6%, var(--card)); }
 .inbox-alert { display: flex; gap: 6px; align-items: center; color: var(--text); border-left: 5px solid var(--warn); margin-bottom: 8px; }
 .inbox-alert .chev { margin-left: auto; }
+.min-pill { display: inline-block; min-width: 42px; text-align: center; padding: 3px 8px; border-radius: 999px; background: var(--bg); font-weight: 800; font-size: 13px; font-variant-numeric: tabular-nums; }
+.report-score { font-size: 34px; font-weight: 800; display: flex; align-items: center; gap: 8px; justify-content: center; margin-top: 6px; }
+.report-score input { width: 64px; font-size: 30px; font-weight: 800; text-align: center; padding: 2px; }
+.num-btn.on { border-color: var(--accent); background: var(--accent); color: #fff; } .num-btn.on small { color: #fff; }
+.num-btn.bench { border-color: var(--line); background: var(--card); }
+.add-row { border: 1.5px dashed var(--line); }

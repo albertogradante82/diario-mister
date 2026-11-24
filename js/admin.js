@@ -72,3 +72,45 @@ export async function chooseFileAsAdmin(accept, reason) {
     };
   });
 }
+
+// ---------- Modalità amministratore (seconda password) ----------
+// Pagamenti, documenti, certificati, scadenze e contatti completi: solo l'amministratore.
+const SUPER_HASH = 'f99f6bcc0a13f307b83f0a13961d457ca2fd0b87ea9cf05156dc1422f89b1e67';
+const SKEY = 'mister-super';
+export function superCode() { try { return localStorage.getItem(SKEY) || ''; } catch { return ''; } }
+export const isSuperMode = () => !!superCode();
+async function superHash(code) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('mister-super:' + code.trim()));
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+export async function superLogin() {
+  return sheet('🔐 Accedi come admin', (body, close) => {
+    body.innerHTML = `<p class="small muted mb">L'amministratore vede pagamenti, documenti, certificati medici, scadenze e i contatti completi (cellulare, email). Il mister li vede oscurati.</p>
+      <form id="suform" class="form"><input id="sucode" type="password" autocomplete="off" autocapitalize="off" placeholder="Password admin" class="code-input">
+      <p class="small warn" id="suerr" hidden>Password errata</p><button class="btn primary block mt">Accedi</button></form>`;
+    const i = body.querySelector('#sucode');
+    setTimeout(() => i.focus(), 300);
+    body.querySelector('#suform').onsubmit = async (e) => {
+      e.preventDefault();
+      if ((await superHash(i.value)) === SUPER_HASH) { try { localStorage.setItem(SKEY, i.value.trim()); } catch { /* */ } toast('Modalità admin attiva 🔐'); close(true); }
+      else { body.querySelector('#suerr').hidden = false; i.value = ''; }
+    };
+  });
+}
+export function superLogout() { try { localStorage.removeItem(SKEY); } catch { /* */ } toast('Uscito dalla modalità admin'); }
+/** Oscura gli ultimi 3 caratteri se non si è amministratore. */
+export const maskTail = (v) => { v = String(v ?? ''); if (isSuperMode() || !v) return v; return v.includes('•') ? v : v.length > 3 ? v.slice(0, -3) + '•••' : '•••'; };
+
+// Ogni chiamata alle API porta la password admin quando la modalità è attiva.
+if (!window.__superFetch) {
+  window.__superFetch = true;
+  const orig = window.fetch.bind(window);
+  window.fetch = (url, opts = {}) => {
+    const code = superCode();
+    if (code && typeof url === 'string' && url.includes('/api/')) {
+      const h = opts.headers instanceof Headers ? Object.fromEntries(opts.headers.entries()) : { ...(opts.headers || {}) };
+      opts = { ...opts, headers: { ...h, 'x-super-code': code } };
+    }
+    return orig(url, opts);
+  };
+}

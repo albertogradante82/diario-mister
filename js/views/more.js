@@ -1,5 +1,5 @@
 import * as db from '../db.js';
-import { chooseFileAsAdmin } from '../admin.js';
+import { chooseFileAsAdmin, isSuperMode, superLogin, superLogout } from '../admin.js';
 import { unlockClubData, checkClubUpdate } from '../clubdata.js';
 import { setRole, misterLogin, logout } from '../roles.js';
 import { applyAllProfiles } from './players.js';
@@ -105,6 +105,9 @@ export async function moreView(root) {
   const lastBackup = await db.getMeta('lastBackup');
 
   root.innerHTML = `
+    ${isSuperMode()
+      ? '<div class="card admin-on row gap center"><span style="font-size:24px">🔐</span><div class="grow"><strong>Modalità admin attiva</strong><div class="small muted">Vedi pagamenti, documenti, certificati e contatti completi</div></div><button class="btn small" id="superOut">Esci</button></div>'
+      : '<button class="btn primary block mb" id="superIn">🔐 Accedi come admin</button>'}
     <h2 class="section">Archivio condiviso</h2>
     <div class="card" id="syncCard"></div>
 
@@ -183,6 +186,8 @@ export async function moreView(root) {
   on(root, 'clubData', loadClubData);
   on(root, 'profiles', applyAllProfiles);
   on(root, 'privacy', () => import('../privacy.js').then((m) => m.showPrivacy()));
+  if ($('#superIn', root)) $('#superIn', root).onclick = async () => { if (await superLogin()) route(); };
+  if ($('#superOut', root)) $('#superOut', root).onclick = () => { superLogout(); route(); };
   on(root, 'install', installApp);
   on(root, 'shareapp', shareApp);
   on(root, 'push', () => import('../push.js').then((P) => P.pushSheet(async () => {

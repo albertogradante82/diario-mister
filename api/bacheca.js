@@ -5,7 +5,7 @@
 //   avv:read:<id>   hash playerId -> timestamp lettura
 //   avv:rep:<id>    lista JSON risposte { rid, playerId, name, text, at, mister }
 const crypto = require('crypto');
-const { redisConfig, pipeline, isAdmin, ip, send, readBody, limited, hashToObj, authPlayer, roster: rosterOf } = require('./_lib.js');
+const { isSuper, maskTail, redisConfig, pipeline, isAdmin, ip, send, readBody, limited, hashToObj, authPlayer, roster: rosterOf } = require('./_lib.js');
 const { notify, quando } = require('./_push.js');
 
 const PID = /^imp-[0-9a-f]{16}$/;
@@ -153,7 +153,14 @@ module.exports = async function handler(req, res) {
       const parents = [];
       Object.values(hashToObj(parAll)).map((j) => JSON.parse(j)).forEach((g) => (g.children || []).filter((c) => c.status === 'pending')
         .forEach((c) => parents.push({ parentId: g.id, name: `${g.firstName} ${g.lastName}`, relation: g.relation, playerId: c.playerId, player: r.players[c.playerId]?.name || '', team: r.teams[r.players[c.playerId]?.teamId]?.name || '', at: c.at })));
-      return send(res, 200, { log: (log || []).map((j) => JSON.parse(j)), staff, parents });
+      const full = isSuper(req);
+      const priv = ['documento', 'ricevuta', 'fattura'];
+      return send(res, 200, {
+        full,
+        log: (log || []).map((j) => JSON.parse(j)).filter((a) => full || !priv.includes(a.type)),
+        staff: full ? staff : staff.map((s) => ({ ...s, phone: maskTail(s.phone), email: maskTail(s.email) })),
+        parents,
+      });
     }
 
     if (req.method === 'GET' && action === 'reads') {

@@ -5,6 +5,7 @@ import { seasonData, seasonTotals, per90, playerSeries, METRICS, numberAt, detec
 import { lineChart, pitchHeatmap, mergeHeatmaps } from '../charts.js';
 import { exportPlayerPdf } from '../pdf.js';
 import { listProfiles, getPhoto, privateProfiles, resetPin, eraseProfile } from '../profiles.js';
+import { isSuperMode, maskTail } from '../admin.js';
 
 // ---------- Rosa ----------
 
@@ -89,7 +90,7 @@ export async function playerView(root, id) {
   const info = [
     ['Ruolo', p.role], ['Posizione', p.position], ['Piede', p.foot], ['Nato il', p.birthDate ? `${fmtDate(p.birthDate)} (${age(p.birthDate)} anni)` : ''],
     ['Luogo di nascita', p.birthPlace], ['Altezza', p.height ? `${p.height} cm` : ''], ['Peso', p.weight ? `${p.weight} kg` : ''],
-    ['Cellulare', p.phone], ['Email', p.email], ['Contatto genitore', p.contact], ['Visita medica', p.medicalExpiry ? `scade il ${fmtDate(p.medicalExpiry)}` : ''],
+    ['Cellulare', maskTail(p.phone)], ['Email', maskTail(p.email)], ['Contatto genitore', maskTail(p.contact)], ['Visita medica', isSuperMode() && p.medicalExpiry ? `scade il ${fmtDate(p.medicalExpiry)}` : ''],
     ...(team?.customFields || []).map((c) => [c.name, (p.custom || {})[c.id]]),
   ].filter(([, v]) => v != null && v !== '');
 
@@ -235,10 +236,10 @@ export async function playerEditView(root, id) {
         ${field('Data di nascita', 'birthDate', p.birthDate, 'date')}
         ${field('Luogo di nascita', 'birthPlace', p.birthPlace)}
         <div class="row gap">${field('Altezza (cm)', 'height', p.height, 'number', 'inputmode="numeric"')}${field('Peso (kg)', 'weight', p.weight, 'number', 'inputmode="decimal" step="0.1"')}</div>
-        ${field('Cellulare', 'phone', p.phone, 'tel', 'inputmode="tel"')}
+        ${isSuperMode() ? `${field('Cellulare', 'phone', p.phone, 'tel', 'inputmode="tel"')}
         ${field('Email', 'email', p.email, 'email')}
         ${field('Contatto genitore', 'contact', p.contact, 'text', 'placeholder="Nome e telefono"')}
-        ${field('Scadenza visita medica', 'medicalExpiry', p.medicalExpiry, 'date')}
+        ${field('Scadenza visita medica', 'medicalExpiry', p.medicalExpiry, 'date')}` : `<p class="small muted">📱 ${esc(maskTail(p.phone) || '–')} · ✉️ ${esc(maskTail(p.email) || '–')}<br>🔐 Contatti completi e scadenza visita medica: solo amministratore.</p>`}
       </div>
       ${(team?.customFields || []).length ? `<div class="card"><h3>Campi personalizzati</h3>
         ${team.customFields.map((c) => field(esc(c.name), 'cf_' + c.id, (p.custom || {})[c.id], c.type === 'number' ? 'number' : 'text')).join('')}</div>` : ''}
@@ -272,7 +273,7 @@ export async function playerEditView(root, id) {
   $('#pf', root).onsubmit = async (e) => {
     e.preventDefault();
     const f = new FormData(e.target);
-    ['firstName', 'lastName', 'role', 'position', 'foot', 'birthDate', 'birthPlace', 'phone', 'email', 'contact', 'medicalExpiry', 'notes'].forEach((k) => (p[k] = (f.get(k) || '').trim()));
+    ['firstName', 'lastName', 'role', 'position', 'foot', 'birthDate', 'birthPlace', 'phone', 'email', 'contact', 'medicalExpiry', 'notes'].forEach((k) => { if (f.has(k)) p[k] = (f.get(k) || '').trim(); });
     ['number', 'height', 'weight'].forEach((k) => { const v = f.get(k); p[k] = v === '' || v == null ? '' : Number(v); });
     p.custom = p.custom || {};
     (team?.customFields || []).forEach((c) => { p.custom[c.id] = f.get('cf_' + c.id); });
@@ -335,8 +336,8 @@ async function showRemoteProfile(el, p) {
   if (ap) ap.onclick = async () => {
     if (photo) p.photo = photo;
     if (pub.birthDate) p.birthDate = pub.birthDate;
-    if (priv?.phone) p.phone = priv.phone;
-    if (priv?.email) p.email = priv.email;
+    if (priv?.phone && !priv.masked) p.phone = priv.phone;
+    if (priv?.email && !priv.masked) p.email = priv.email;
     await db.put('players', p);
     toast('Profilo aggiornato con i dati del giocatore');
     route();
@@ -368,8 +369,8 @@ export async function applyAllProfiles() {
     if (!pub) continue;
     if (pub.hasPhoto) { const ph = await getPhoto(p.id); if (ph) p.photo = ph; }
     if (pub.birthDate) p.birthDate = pub.birthDate;
-    if (priv[p.id]?.phone) p.phone = priv[p.id].phone;
-    if (priv[p.id]?.email) p.email = priv[p.id].email;
+    if (priv[p.id]?.phone && !priv[p.id].masked) p.phone = priv[p.id].phone;
+    if (priv[p.id]?.email && !priv[p.id].masked) p.email = priv[p.id].email;
     changed.push(p);
   }
   await db.putMany('players', changed);

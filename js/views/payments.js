@@ -3,6 +3,7 @@
 import * as db from '../db.js';
 import { esc, toast, sheet, confirmDialog, fmtDate, today, fullName, shareOrDownload, $, $$ } from '../util.js';
 import { setHeader, route } from '../app.js';
+import { isSuperMode, superLogin } from '../admin.js';
 import { me, asMe, call, euro } from '../family.js';
 import { needIdentity, whoLine, uploadFlow, docRow, bindDocRows } from './docs.js';
 
@@ -92,6 +93,11 @@ export async function misterPaymentsView(root) {
   setHeader({ title: 'Pagamenti', back: '#/home' });
   const code = await db.getMeta('clubCode');
   if (!code) { root.innerHTML = '<div class="empty"><p>Rientra come mister con la password.</p></div>'; return; }
+  if (!isSuperMode()) {
+    root.innerHTML = '<div class="empty"><div class="empty-icon">🔐</div><p>Solo l\'amministratore può vedere i pagamenti.</p><button class="btn primary" id="sl">Accedi come admin</button></div>';
+    root.querySelector('#sl').onclick = async () => { if (await superLogin()) route(); };
+    return;
+  }
   let data, receipts;
   try {
     [data, receipts] = await Promise.all([call(`${API}?action=list`, null, code), call('./api/documenti?action=list', null, code).then((r) => r.items.filter((x) => x.kind === 'pagamento'))]);

@@ -2,6 +2,7 @@
 import * as db from '../db.js';
 import { esc, toast, sheet, confirmDialog, fmtDate, today, fullName, $, $$ } from '../util.js';
 import { setHeader, route } from '../app.js';
+import { isSuperMode, superLogin } from '../admin.js';
 import { me, parent, asMe, call, fileToPayload, pickFile, openDoc, fmtSize } from '../family.js';
 import { publicData } from './board.js';
 
@@ -96,6 +97,11 @@ export async function misterDocsView(root) {
   setHeader({ title: 'Documenti giocatori', back: '#/home' });
   const code = await db.getMeta('clubCode');
   if (!code) { root.innerHTML = '<div class="empty"><p>Rientra come mister con la password.</p></div>'; return; }
+  if (!isSuperMode()) {
+    root.innerHTML = '<div class="empty"><div class="empty-icon">🔐</div><p>Solo l\'amministratore può vedere documenti e certificati.</p><button class="btn primary" id="sl">Accedi come admin</button></div>';
+    root.querySelector('#sl').onclick = async () => { if (await superLogin()) route(); };
+    return;
+  }
   let items;
   try { items = (await call('./api/documenti?action=list', null, code)).items.filter((d) => d.kind !== 'pagamento'); } catch (e) { root.innerHTML = `<div class="empty"><p>${esc(e.message)}</p></div>`; return; }
   const [teams, players] = await Promise.all([db.all('teams'), db.all('players')]);

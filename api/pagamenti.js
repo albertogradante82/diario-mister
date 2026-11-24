@@ -4,7 +4,7 @@
 // Redis:  pay:conf   JSON { season, unica:{amount,due}, rate:[{key,amount,due}] }
 //         pay:list   hash playerId -> JSON { plan:'unica'|'rate'|'', paid:{ unica|r1|r2: {at, amount, method, date} }, exempt, note, updatedAt }
 //         pay:fatt   hash playerId -> JSON { intestatario, codiceFiscale, partitaIva, indirizzo, cap, citta, provincia, email, pec, sdi, note, by, at }
-const { redisConfig, pipeline, isAdmin, ip, send, readBody, limited, hashToObj, authPlayer, roster, logActivity } = require('./_lib.js');
+const { isSuper, redisConfig, pipeline, isAdmin, ip, send, readBody, limited, hashToObj, authPlayer, roster, logActivity } = require('./_lib.js');
 const { notify } = require('./_push.js');
 
 const PID = /^imp-[0-9a-f]{16}$/;
@@ -79,7 +79,7 @@ module.exports = async function handler(req, res) {
 
     // ---- mister ----
     if (await limited(cfg, `rl:adm:${ip(req)}`, 300, 900)) return send(res, 429, { error: 'Troppe richieste, riprova più tardi.' });
-    if (!isAdmin(req)) return send(res, 401, { error: 'Password amministratore errata.' });
+    if (!isSuper(req)) return send(res, 403, { error: 'Solo l\'amministratore può vedere i pagamenti: Altro → Accedi come admin.' });
 
     if (req.method === 'GET' && action === 'list') {
       const [list, fatt] = await pipeline(cfg, [['HGETALL', 'pay:list'], ['HGETALL', 'pay:fatt']]);

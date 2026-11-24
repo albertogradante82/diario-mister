@@ -5,7 +5,7 @@
 // Redis:  doc:meta            hash docId -> JSON { id, playerId, kind, name, mime, size, chunks, note, expiry, rata, by, at }
 //         doc:data:<id>:<n>   pezzo n del file (base64)
 const crypto = require('crypto');
-const { redisConfig, pipeline, isAdmin, ip, send, readBody, limited, hashToObj, authPlayer, roster, logActivity } = require('./_lib.js');
+const { isSuper, redisConfig, pipeline, isAdmin, ip, send, readBody, limited, hashToObj, authPlayer, roster, logActivity } = require('./_lib.js');
 const { notify } = require('./_push.js');
 
 const DID = /^d-[0-9a-f]{16}$/;
@@ -82,7 +82,7 @@ module.exports = async function handler(req, res) {
 
     // ---- mister ----
     if (await limited(cfg, `rl:adm:${ip(req)}`, 300, 900)) return send(res, 429, { error: 'Troppe richieste, riprova più tardi.' });
-    if (!isAdmin(req)) return send(res, 401, { error: 'Password amministratore errata.' });
+    if (!isSuper(req)) return send(res, 403, { error: 'Solo l\'amministratore può vedere documenti e certificati: Altro → Accedi come admin.' });
 
     if (req.method === 'GET' && action === 'list') return send(res, 200, { items: await allMeta(cfg) });
 

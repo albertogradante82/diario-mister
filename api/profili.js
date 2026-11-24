@@ -34,7 +34,7 @@ async function pipeline(cfg, commands) {
 }
 
 const sha = (s) => crypto.createHash('sha256').update(String(s)).digest('hex');
-const { authPlayer } = require('./_lib.js');
+const { authPlayer, isSuper, maskTail } = require('./_lib.js');
 const pinHash = (id, pin) => sha(`mister-pin:${id}:${pin}`);
 function safeEq(a, b) {
   return crypto.timingSafeEqual(Buffer.from(sha(a)), Buffer.from(sha(b)));
@@ -94,8 +94,12 @@ module.exports = async function handler(req, res) {
     if (req.method === 'GET' && action === 'list') {
       const [all] = await pipeline(cfg, [['HGETALL', 'prof:pub']]);
       const profiles = {};
-      for (let i = 0; i < (all || []).length; i += 2) profiles[all[i]] = JSON.parse(all[i + 1]);
-      return send(res, 200, { profiles });
+      const full = isSuper(req);
+      for (let i = 0; i < (all || []).length; i += 2) {
+        const pr = JSON.parse(all[i + 1]);
+        profiles[all[i]] = full ? pr : { ...pr, phone: maskTail(pr.phone), email: maskTail(pr.email), masked: true };
+      }
+      return send(res, 200, { profiles, full });
     }
 
     if (req.method === 'GET' && action === 'photo') {

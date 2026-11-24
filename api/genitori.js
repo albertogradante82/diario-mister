@@ -6,7 +6,7 @@
 //         par:pin    hash parentId -> sha256 del PIN
 //         par:email  hash email (minuscolo) -> parentId
 const crypto = require('crypto');
-const { redisConfig, pipeline, sha, pinHash, parPinHash, safeEq, isAdmin, ip, send, readBody, limited, hashToObj, roster, logActivity } = require('./_lib.js');
+const { isSuper, maskTail, redisConfig, pipeline, sha, pinHash, parPinHash, safeEq, isAdmin, ip, send, readBody, limited, hashToObj, roster, logActivity } = require('./_lib.js');
 
 const STAFF_ROLES = ['Dirigente accompagnatore', 'Allenatore', 'Allenatore in seconda', 'Preparatore dei portieri', 'Preparatore atletico', 'Medico / massaggiatore', 'Altro'];
 const DOCS = ["Carta d'identità", 'Patente', 'Passaporto', 'Altro'];
@@ -205,7 +205,8 @@ module.exports = async function handler(req, res) {
       const [all] = await pipeline(cfg, [['HGETALL', 'par:list']]);
       const items = await Promise.all(Object.values(hashToObj(all)).map((j) => withNames(req, JSON.parse(j), cfg)));
       items.sort((a, b) => `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`));
-      return send(res, 200, { items });
+      const full = isSuper(req);
+      return send(res, 200, { full, items: full ? items : items.map((g) => ({ ...g, phone: maskTail(g.phone), email: maskTail(g.email), taxCode: maskTail(g.taxCode), consent: undefined })) });
     }
 
     if (req.method === 'GET' && action === 'code') return send(res, 200, { code: await clubPin(cfg) });

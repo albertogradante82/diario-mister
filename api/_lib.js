@@ -22,7 +22,12 @@ async function pipeline(cfg, commands) {
 const sha = (s) => crypto.createHash('sha256').update(String(s)).digest('hex');
 const pinHash = (id, pin) => sha(`mister-pin:${id}:${pin}`);
 const safeEq = (a, b) => crypto.timingSafeEqual(Buffer.from(sha(a)), Buffer.from(sha(b)));
-const isAdmin = (req) => safeEq(sha('mister-admin:' + String(req.headers['x-admin-code'] || '').trim()), ADMIN_HASH);
+const SUPER_HASH = process.env.SUPER_HASH || 'f99f6bcc0a13f307b83f0a13961d457ca2fd0b87ea9cf05156dc1422f89b1e67';
+/** Amministratore (seconda password): pagamenti, documenti, certificati, contatti completi. */
+const isSuper = (req) => safeEq(sha('mister-super:' + String(req.headers['x-super-code'] || '').trim()), SUPER_HASH);
+/** Oscura gli ultimi 3 caratteri (cellulari, email, codici) per chi non è amministratore. */
+const maskTail = (v) => { v = String(v || ''); return v.length > 3 ? v.slice(0, -3) + '•••' : v ? '•••' : ''; };
+const isMisterOnly = (req) => safeEq(sha('mister-admin:' + String(req.headers['x-admin-code'] || '').trim()), ADMIN_HASH);
 const ip = (req) => String(req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'x').split(',')[0].trim();
 
 function send(res, status, body) {
@@ -101,4 +106,6 @@ async function logActivity(cfg, item) {
   try { await pipeline(cfg, [['LPUSH', 'act:log', JSON.stringify({ ...item, at: Date.now() })], ['LTRIM', 'act:log', 0, 199]]); } catch { /* non blocca */ }
 }
 
-module.exports = { logActivity, redisConfig, pipeline, sha, pinHash, parPinHash, safeEq, isAdmin, ip, send, readBody, limited, hashToObj, authPlayer, roster };
+const isAdmin = (req) => isMisterOnly(req) || isSuper(req);
+
+module.exports = { isSuper, maskTail, logActivity, redisConfig, pipeline, sha, pinHash, parPinHash, safeEq, isAdmin, ip, send, readBody, limited, hashToObj, authPlayer, roster };

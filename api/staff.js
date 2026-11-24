@@ -8,7 +8,7 @@
 // Redis:  staff:list  hash staffId -> JSON profilo
 //         staff:pin   hash staffId -> sha256 del PIN
 const crypto = require('crypto');
-const { redisConfig, pipeline, sha, safeEq, isAdmin, ip, send, readBody, limited, hashToObj } = require('./_lib.js');
+const { isSuper, maskTail, redisConfig, pipeline, sha, safeEq, isAdmin, ip, send, readBody, limited, hashToObj } = require('./_lib.js');
 
 const SID = /^s-[0-9a-f]{16}$/;
 const TID = /^imp-[0-9a-f]{16}$/;
@@ -21,6 +21,8 @@ const staffPinHash = (id, pin) => sha(`mister-staff-pin:${id}:${pin}`);
 
 /** Campi modificabili; `teams` e `role` li decide solo il mister. */
 function clean(b, prev, { admin }) {
+  // valori oscurati (mister senza password admin): si tengono quelli salvati
+  ['phone', 'email', 'taxCode'].forEach((k) => { if (String(b[k] || '').includes('•')) b = { ...b, [k]: prev?.[k] || '' }; });
   const keep = (k, v) => (v === undefined ? prev?.[k] ?? '' : v);
   return {
     firstName: str(keep('firstName', b.firstName), 40), lastName: str(keep('lastName', b.lastName), 40),
@@ -93,6 +95,7 @@ module.exports = async function handler(req, res) {
       const hasPin = new Set(pins || []);
       const items = Object.values(hashToObj(all)).map((j) => ({ ...JSON.parse(j), hasPin: false }))
         .map((s) => ({ ...s, hasPin: hasPin.has(s.id) }))
+        .map((s) => (isSuper(req) ? s : { ...s, phone: maskTail(s.phone), email: maskTail(s.email), taxCode: maskTail(s.taxCode), consent: undefined }))
         .sort((a, b) => `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`));
       return send(res, 200, { items });
     }

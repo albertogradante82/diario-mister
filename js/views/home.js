@@ -1,4 +1,5 @@
 import * as db from '../db.js';
+import { isSuperMode } from '../admin.js';
 import { esc, fmtDate, today, fullName, avatar } from '../util.js';
 import { setHeader, loadSeason, setCurrent } from '../app.js';
 import { loadClubData } from './more.js';
@@ -50,6 +51,7 @@ export async function homeView(root) {
   let notices = [];
   try { notices = (await listNotices()).slice(0, 2); } catch { /* bacheca non attiva */ }
   const updBanner = sessionStorage.getItem('clubUpdate') ? `<button class="choice choice-main" id="clubupd"><span class="choice-icon">🔄</span><span><strong>Nuovi risultati e classifiche disponibili</strong><small>Tocca per aggiornare i dati del Calcio Palazzo.</small></span></button>` : '';
+  const superOn = isSuperMode();
   root.innerHTML = `${updBanner}
     ${next ? `
     <div class="card next-match ${live ? 'is-live' : ''}">
@@ -115,8 +117,7 @@ export async function homeView(root) {
     <div class="quick">
       <button class="quick-btn" id="newstaff"><span>🧑‍💼</span>Nuovo mister / accompagnatore</button>
       <a class="quick-btn" href="#/staff"><span>🪪</span>Staff e documenti</a>
-      <a class="quick-btn" href="#/pagamenti"><span>💶</span>Pagamenti</a>
-      <a class="quick-btn" href="#/documenti"><span>📄</span>Documenti giocatori</a>
+      ${superOn ? '<a class="quick-btn" href="#/pagamenti"><span>💶</span>Pagamenti</a><a class="quick-btn" href="#/documenti"><span>📄</span>Documenti giocatori</a>' : ''}
       <a class="quick-btn" href="#/genitori"><span>👨‍👩‍👧</span>Genitori</a>
       <a class="quick-btn" href="#/convocazioni"><span>⚽</span>Convocazioni partita</a>
       <a class="quick-btn" href="#/allenamenti"><span>🏃</span>Presenze allenamenti</a>

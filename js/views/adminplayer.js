@@ -4,6 +4,7 @@ import { esc, toast, sheet, confirmDialog, fmtDate, today } from '../util.js';
 import { call, euro } from '../family.js';
 import { docRow, bindDocRows, KINDS } from './docs.js';
 import { payStatus } from './payments.js';
+import { isSuperMode } from '../admin.js';
 
 const RLABEL = { unica: 'Rata unica', r1: '1ª rata', r2: '2ª rata' };
 let cache = null, cacheAt = 0;
@@ -11,7 +12,7 @@ let cache = null, cacheAt = 0;
 /** Documenti e pagamenti di tutti (una richiesta, valida 30 s). */
 export async function adminData(fresh = false) {
   const code = await db.getMeta('clubCode');
-  if (!code) return null;
+  if (!code || !isSuperMode()) return null;
   if (!fresh && cache && Date.now() - cacheAt < 30000) return { ...cache, code };
   const [docs, pay] = await Promise.all([call('./api/documenti?action=list', null, code), call('./api/pagamenti?action=list', null, code)]);
   cache = { docs: docs.items, ...pay };
@@ -35,7 +36,7 @@ export function quickStatus(d, p) {
 export async function adminPlayerCard(box, p) {
   let d;
   try { d = await adminData(true); } catch (e) { box.innerHTML = `<div class="card small warn">Documenti e pagamenti: ${esc(e.message)}</div>`; return; }
-  if (!d) { box.innerHTML = '<div class="card small muted">🔒 Documenti e pagamenti: entra con la password del mister.</div>'; return; }
+  if (!d) { box.innerHTML = '<div class="card small muted">🔐 Documenti, certificati e pagamenti: visibili solo all\'amministratore (Altro → Accedi come admin).</div>'; return; }
   const { code } = d;
   const td = today();
   const ds = d.docs.filter((x) => x.playerId === p.id);

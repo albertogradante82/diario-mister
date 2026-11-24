@@ -177,7 +177,7 @@ export function reportView(admin) {
 
         <h2 class="section">⚽ Eventi</h2>
         ${evSorted.length ? `<div class="list">${evSorted.map((e) => `<div class="item"><span class="min-pill">${e.half}T ${e.min}′</span><span style="font-size:20px">${EV[e.type][0]}</span>
-          <div class="grow small"><strong>${esc(EV[e.type][1])}</strong>${e.playerId ? ' · ' + esc(name(e.playerId)) : ''}${e.assistId ? `<div class="muted">assist: ${esc(name(e.assistId))}</div>` : ''}${e.note ? `<div class="muted">${esc(e.note)}</div>` : ''}</div>
+          <div class="grow small"><strong>${esc(EV[e.type][1])}</strong>${e.playerId ? ' · ' + esc(name(e.playerId)) : e.type === 'gol' ? ' · <span class="muted">marcatore non indicato</span>' : ''}${e.assistId ? `<div class="muted">assist: ${esc(name(e.assistId))}</div>` : ''}${e.note ? `<div class="muted">${esc(e.note)}</div>` : ''}</div>
           ${canEdit ? `<button class="btn-text small danger" data-dev="${e.i}">✕</button>` : ''}</div>`).join('')}</div>` : '<p class="small muted">Nessun evento.</p>'}
         ${canEdit ? `<form class="card form add-row" id="addev">
           <label>Evento<select name="type">${Object.entries(EV).map(([k, [i, l]]) => `<option value="${k}">${i} ${l}</option>`).join('')}</select></label>

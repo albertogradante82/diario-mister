@@ -14,11 +14,13 @@ const DEFAULT_CONF = {
   season: '2026/27',
   unica: { amount: 450, due: '2026-09-30' },
   rate: [{ key: 'r1', amount: 250, due: '2026-09-30' }, { key: 'r2', amount: 200, due: '2026-12-31' }],
+  exemptTeams: ['imp-17fa2ce80b5d0376'], // Prima Squadra: non paga la quota
 };
 
 async function conf(cfg) {
   const [raw] = await pipeline(cfg, [['GET', 'pay:conf']]);
-  return raw ? JSON.parse(raw) : DEFAULT_CONF;
+  const c = raw ? JSON.parse(raw) : {};
+  return { ...DEFAULT_CONF, ...c, exemptTeams: Array.isArray(c.exemptTeams) ? c.exemptTeams : DEFAULT_CONF.exemptTeams };
 }
 
 function cleanFatt(b) {
@@ -47,7 +49,10 @@ module.exports = async function handler(req, res) {
       const [rec, fatt] = await pipeline(cfg, [['HGET', 'pay:list', b.playerId], ['HGET', 'pay:fatt', b.playerId]]);
       const r = rec ? JSON.parse(rec) : { plan: '', paid: {} };
 
-      if (action === 'mine') return send(res, 200, { conf: await conf(cfg), rec: r, fattura: fatt ? JSON.parse(fatt) : null });
+      if (action === 'mine') {
+        const ro = await roster(req);
+        return send(res, 200, { conf: await conf(cfg), rec: r, fattura: fatt ? JSON.parse(fatt) : null, teamId: ro.players[b.playerId]?.teamId || '' });
+      }
 
       if (action === 'plan') {
         if (!['unica', 'rate'].includes(b.plan)) return send(res, 400, { error: 'Scegli rata unica o due rate.' });
@@ -120,6 +125,7 @@ module.exports = async function handler(req, res) {
         season: str(b.season, 10) || DEFAULT_CONF.season,
         unica: { amount: n(b.unica?.amount), due: d(b.unica?.due, DEFAULT_CONF.unica.due) },
         rate: [0, 1].map((i) => ({ key: `r${i + 1}`, amount: n(b.rate?.[i]?.amount), due: d(b.rate?.[i]?.due, DEFAULT_CONF.rate[i].due) })),
+        exemptTeams: Array.isArray(b.exemptTeams) ? b.exemptTeams.filter((t) => /^imp-[0-9a-f]{16}$/.test(t)).slice(0, 30) : DEFAULT_CONF.exemptTeams,
       };
       await pipeline(cfg, [['SET', 'pay:conf', JSON.stringify(c)]]);
       return send(res, 200, { conf: c });

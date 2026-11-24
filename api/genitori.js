@@ -25,6 +25,21 @@ function fields(b, prev = {}) {
   };
 }
 
+/** PIN dei genitori: lo decide il mister, serve per registrarsi ed entrare da un nuovo telefono. */
+async function clubPin(cfg) {
+  const [cur] = await pipeline(cfg, [['GET', 'par:code']]);
+  if (cur) return cur;
+  const code = String(crypto.randomInt(100000, 1000000));
+  await pipeline(cfg, [['SETNX', 'par:code', code]]);
+  const [again] = await pipeline(cfg, [['GET', 'par:code']]);
+  return again;
+}
+async function checkClubPin(cfg, req, b) {
+  if (await limited(cfg, `rl:gcode:${ip(req)}`, 20, 3600)) return 'Troppi tentativi, riprova tra un\'ora.';
+  const code = await clubPin(cfg);
+  return safeEq(String(b.clubPin || '').trim(), code) ? null : 'PIN genitori della società errato: chiedilo al mister.';
+}
+
 async function auth(cfg, id, pin) {
   if (!GID.test(String(id)) || !PIN.test(String(pin || ''))) return { error: 'Accesso non valido.', status: 400 };
   if (await limited(cfg, `rl:gpin:${id}`, 60, 3600)) return { error: 'Troppi tentativi con il PIN: riprova tra un\'ora.', status: 429 };
@@ -51,6 +66,8 @@ module.exports = async function handler(req, res) {
     if (req.method === 'POST' && action === 'register') {
       if (await limited(cfg, `rl:greg:${ip(req)}`, 10, 3600)) return send(res, 429, { error: 'Troppe registrazioni da questa rete, riprova più tardi.' });
       const b = await readBody(req);
+      const ce = await checkClubPin(cfg, req, b);
+      if (ce) return send(res, 403, { error: ce });
       const f = fields(b);
       if (!f.firstName || !f.lastName) return send(res, 400, { error: 'Inserisci nome e cognome.' });
       if (!EMAIL.test(f.email)) return send(res, 400, { error: 'Inserisci un\'email valida: serve per accedere da un altro telefono.' });
@@ -68,6 +85,8 @@ module.exports = async function handler(req, res) {
     if (req.method === 'POST' && action === 'login') {
       if (await limited(cfg, `rl:glog:${ip(req)}`, 30, 3600)) return send(res, 429, { error: 'Troppi tentativi, riprova più tardi.' });
       const b = await readBody(req);
+      const ce = await checkClubPin(cfg, req, b);
+      if (ce) return send(res, 403, { error: ce });
       const [id] = await pipeline(cfg, [['HGET', 'par:email', str(b.email, 80).toLowerCase()]]);
       if (!id) return send(res, 403, { error: 'Email o PIN errati.' });
       const a = await auth(cfg, id, b.pin);
@@ -142,6 +161,15 @@ module.exports = async function handler(req, res) {
       const items = await Promise.all(Object.values(hashToObj(all)).map((j) => withNames(req, JSON.parse(j))));
       items.sort((a, b) => `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`));
       return send(res, 200, { items });
+    }
+
+    if (req.method === 'GET' && action === 'code') return send(res, 200, { code: await clubPin(cfg) });
+
+    if (req.method === 'POST' && action === 'setcode') {
+      const { code } = await readBody(req);
+      if (!/^\d{4,8}$/.test(String(code || ''))) return send(res, 400, { error: 'Il PIN genitori deve avere da 4 a 8 cifre.' });
+      await pipeline(cfg, [['SET', 'par:code', String(code)]]);
+      return send(res, 200, { code: String(code) });
     }
 
     if (req.method === 'POST' && (action === 'approve' || action === 'reject')) {

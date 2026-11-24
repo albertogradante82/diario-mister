@@ -14,9 +14,9 @@ export function dues(conf, rec) {
   const plan = rec?.plan || '';
   return plan === 'unica' ? [{ key: 'unica', ...conf.unica }] : conf.rate.map((r) => ({ ...r }));
 }
-export function payStatus(conf, rec) {
+export function payStatus(conf, rec, teamId) {
   const td = today();
-  if (rec?.exempt) return { exempt: true, total: 0, paid: 0, overdue: 0, list: [] };
+  if (rec?.exempt || (teamId && (conf.exemptTeams || []).includes(teamId))) return { exempt: true, total: 0, paid: 0, overdue: 0, list: [] };
   const list = dues(conf, rec).map((d) => {
     const p = rec?.paid?.[d.key];
     return { ...d, paid: p || null, overdue: !p && d.due < td };
@@ -38,13 +38,14 @@ export async function playerPaymentsView(root) {
   let d, docs;
   try { [d, docs] = await Promise.all([asMe('pagamenti', 'mine'), asMe('documenti', 'list').then((r) => r.items.filter((x) => x.kind === 'pagamento'))]); }
   catch (e) { root.innerHTML = `<div class="empty"><p>${esc(e.message)}</p></div>`; return; }
-  const { conf, rec, fattura } = d;
-  const st = payStatus(conf, rec);
+  const { conf, rec, fattura, teamId } = d;
+  const teamExempt = (conf.exemptTeams || []).includes(teamId);
+  const st = payStatus(conf, rec, teamId);
   const plan = rec.plan || '';
   const fv = (k) => esc(fattura?.[k] || '');
   root.innerHTML = `<div class="card small">${await whoLine()}</div>
     <h2 class="section">💶 Quota stagione ${esc(conf.season)}</h2>
-    ${rec.exempt ? '<div class="card cert-card">✓ Quota non dovuta (esonero indicato dal mister).</div>' : `
+    ${teamExempt ? '<div class="card cert-card">✓ La tua squadra non paga la quota di iscrizione.</div>' : rec.exempt ? '<div class="card cert-card">✓ Quota non dovuta (esonero indicato dal mister).</div>' : `
     <div class="card">
       <p class="small muted mb">Scegli come pagare:</p>
       <div class="pay-plans">
@@ -105,13 +106,16 @@ export async function misterPaymentsView(root) {
   receipts.forEach((d) => (rcBy[d.playerId] = rcBy[d.playerId] || []).push(d));
 
   const draw = () => {
-    const list = players.filter((p) => sel === 'tutte' || p.teamId === sel).sort((a, b) => fullName(a).localeCompare(fullName(b)));
-    const sts = list.map((p) => payStatus(conf, recs[p.id]));
+    const exT = new Set(conf.exemptTeams || []);
+    // le squadre esonerate non compaiono nelle quote
+    const list = players.filter((p) => !exT.has(p.teamId) && (sel === 'tutte' || p.teamId === sel)).sort((a, b) => fullName(a).localeCompare(fullName(b)));
+    const sts = list.map((p) => payStatus(conf, recs[p.id], p.teamId));
     const sum = (f) => sts.reduce((s, x) => s + f(x), 0);
     const fl = Object.entries(fatture).map(([pid, f]) => ({ pid, f, p: players.find((x) => x.id === pid) })).filter((x) => x.p && (sel === 'tutte' || x.p.teamId === sel)).sort((a, b) => b.f.at - a.f.at);
     root.innerHTML = `
       <div class="seg mb"><label><input type="radio" name="pt" value="quote" ${tab === 'quote' ? 'checked' : ''}><span>Quote</span></label><label><input type="radio" name="pt" value="fatture" ${tab === 'fatture' ? 'checked' : ''}><span>🧾 Fatture (${Object.keys(fatture).length})</span></label><label><input type="radio" name="pt" value="imp" ${tab === 'imp' ? 'checked' : ''}><span>⚙️ Importi</span></label></div>
-      <div class="chips mb"><button class="chip-btn ${sel === 'tutte' ? 'on' : ''}" data-t="tutte">Tutte</button>${teams.map((t) => `<button class="chip-btn ${t.id === sel ? 'on' : ''}" data-t="${t.id}">${esc(t.name)}</button>`).join('')}</div>
+      <div class="chips mb"><button class="chip-btn ${sel === 'tutte' ? 'on' : ''}" data-t="tutte">Tutte</button>${teams.filter((t) => !exT.has(t.id)).map((t) => `<button class="chip-btn ${t.id === sel ? 'on' : ''}" data-t="${t.id}">${esc(t.name)}</button>`).join('')}</div>
+      ${exT.size ? `<p class="small muted mb">Esonerate (non pagano): ${esc(teams.filter((t) => exT.has(t.id)).map((t) => t.name).join(', '))}</p>` : ''}
       <div id="pane"></div>`;
     const pane = $('#pane', root);
     if (tab === 'quote') {
@@ -173,13 +177,15 @@ export async function misterPaymentsView(root) {
         <div class="row gap"><label class="grow">Importo €<input name="ua" type="number" value="${conf.unica.amount}"></label><label class="grow">Entro il<input name="ud" type="date" value="${conf.unica.due}"></label></div>
         <h3>Due rate</h3>
         ${conf.rate.map((r, i) => `<div class="row gap"><label class="grow">${i + 1}ª rata €<input name="r${i}a" type="number" value="${r.amount}"></label><label class="grow">Entro il<input name="r${i}d" type="date" value="${r.due}"></label></div>`).join('')}
+        <h3>Squadre esonerate (non pagano la quota)</h3>
+        <div class="chips">${teams.map((t) => `<label class="chip"><input type="checkbox" name="ex" value="${t.id}" ${exT.has(t.id) ? 'checked' : ''}><span>${esc(t.name)}</span></label>`).join('')}</div>
         <button class="btn primary block mt">Salva importi</button>
         <p class="small muted">Valgono per tutti i giocatori. Chi non deve pagare si segna come esonerato (tocca il nome nella lista).</p></form>`;
       $('#cf', pane).onsubmit = async (e) => {
         e.preventDefault();
         const f = e.target;
         try {
-          const r = await call(`${API}?action=conf`, { season: f.season.value, unica: { amount: f.ua.value, due: f.ud.value }, rate: [0, 1].map((i) => ({ amount: f[`r${i}a`].value, due: f[`r${i}d`].value })) }, code);
+          const r = await call(`${API}?action=conf`, { season: f.season.value, unica: { amount: f.ua.value, due: f.ud.value }, rate: [0, 1].map((i) => ({ amount: f[`r${i}a`].value, due: f[`r${i}d`].value })), exemptTeams: [...f.querySelectorAll('[name=ex]:checked')].map((x) => x.value) }, code);
           Object.assign(conf, r.conf); toast('Importi salvati ✓'); draw();
         } catch (err) { toast(err.message, 4000); }
       };

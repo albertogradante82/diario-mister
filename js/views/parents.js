@@ -82,6 +82,8 @@ function loginOrRegister(root) {
       <p class="small muted">Registra i tuoi dati, collegati a uno o più figli e vedi bacheca della squadra, convocazioni, allenamenti, documenti e pagamenti. Puoi rispondere alle convocazioni al posto di tuo figlio.</p></div>
     <div class="seg mb"><label><input type="radio" name="m" value="reg" checked><span>Prima volta</span></label><label><input type="radio" name="m" value="log"><span>Ho già un profilo</span></label></div>
     <form class="form card" id="reg">
+      <label>🔑 PIN genitori della società<input name="clubPin" type="password" inputmode="numeric" maxlength="8" required class="code-input" autocomplete="off" value="${esc(localStorage.getItem('mister-clubpin') || '')}"></label>
+      <p class="small muted">Te lo comunica il mister o la società.</p>
       ${formFields()}
       <label>Scegli un PIN di 4-6 cifre<input name="pin" type="password" inputmode="numeric" pattern="[0-9]{4,6}" maxlength="6" required class="code-input" autocomplete="off"></label>
       <p class="small muted">Con email e PIN accedi anche da un altro telefono.</p>
@@ -89,6 +91,7 @@ function loginOrRegister(root) {
         <span>Ho letto l'<a href="#" class="openPrivacy">informativa privacy</a> e acconsento al trattamento dei miei dati e di quelli di mio figlio. <span class="req">*obbligatorio</span></span></label></div>
       <button class="btn primary block mt">Registrati</button></form>
     <form class="form card" id="log" hidden>
+      <label>🔑 PIN genitori della società<input name="clubPin" type="password" inputmode="numeric" maxlength="8" required class="code-input" autocomplete="off" value="${esc(localStorage.getItem('mister-clubpin') || '')}"></label>
       <label>Email<input type="email" name="email" required autocapitalize="off"></label>
       <label>PIN<input name="pin" type="password" inputmode="numeric" maxlength="6" required class="code-input"></label>
       <button class="btn primary block mt">Entra</button>
@@ -100,7 +103,8 @@ function loginOrRegister(root) {
     const f = e.target, pin = f.pin.value;
     if (!f.consent.checked) { toast('Devi accettare l\'informativa privacy.'); return; }
     try {
-      const { parent: g } = await call(`${API}?action=register`, { ...readFields(f), pin, consent: true, privacyVersion: PRIVACY_VERSION });
+      const { parent: g } = await call(`${API}?action=register`, { ...readFields(f), pin, clubPin: f.clubPin.value, consent: true, privacyVersion: PRIVACY_VERSION });
+      localStorage.setItem('mister-clubpin', f.clubPin.value);
       setParent(g, pin);
       toast('Registrazione completata ✓ Ora collega tuo figlio');
       route();
@@ -110,7 +114,7 @@ function loginOrRegister(root) {
   $('#log', root).onsubmit = async (e) => {
     e.preventDefault();
     const f = e.target;
-    try { const { parent: g } = await call(`${API}?action=login`, { email: f.email.value, pin: f.pin.value }); setParent(g, f.pin.value); toast('Bentornato ✓'); route(); }
+    try { const { parent: g } = await call(`${API}?action=login`, { email: f.email.value, pin: f.pin.value, clubPin: f.clubPin.value }); localStorage.setItem('mister-clubpin', f.clubPin.value); setParent(g, f.pin.value); toast('Bentornato ✓'); route(); }
     catch (err) { toast(err.message, 4000); }
   };
 }
@@ -167,10 +171,14 @@ export async function misterParentsView(root) {
   setHeader({ title: 'Genitori', back: '#/home' });
   const code = await db.getMeta('clubCode');
   if (!code) { root.innerHTML = '<div class="empty"><p>Rientra come mister con la password.</p></div>'; return; }
-  let items;
-  try { items = (await call(`${API}?action=list`, null, code)).items; } catch (e) { root.innerHTML = `<div class="empty"><p>${esc(e.message)}</p></div>`; return; }
+  let items, clubPin;
+  try { [items, clubPin] = await Promise.all([call(`${API}?action=list`, null, code).then((r) => r.items), call(`${API}?action=code`, null, code).then((r) => r.code)]); }
+  catch (e) { root.innerHTML = `<div class="empty"><p>${esc(e.message)}</p></div>`; return; }
   const pending = items.flatMap((g) => g.children.filter((c) => c.status === 'pending').map((c) => ({ g, c })));
   root.innerHTML = `
+    <div class="card"><div class="row center gap"><div class="grow"><div class="small muted">🔑 PIN genitori della società</div><div class="club-pin">${esc(clubPin)}</div></div>
+        <button class="btn small" id="sharepin">📤 Invia</button><button class="btn-text small" id="chpin">Cambia</button></div>
+      <p class="small muted">Serve ai genitori per registrarsi e per entrare da un nuovo telefono. Ognuno poi ha il suo PIN personale.</p></div>
     ${pending.length ? `<h2 class="section">⏳ Da confermare · ${pending.length}</h2><div class="list">${pending.map(({ g, c }) => `
       <div class="item"><div class="grow"><strong>${esc(g.firstName)} ${esc(g.lastName)}</strong> <span class="muted small">(${esc(g.relation)})</span>
         <div class="small">chiede di seguire <strong>${esc(c.name)}</strong> · ${esc(c.team)}</div>
@@ -186,6 +194,15 @@ export async function misterParentsView(root) {
         <div class="row gap mt"><button class="btn small" data-pin="${g.id}">🔑 Nuovo PIN</button><button class="btn small danger" data-del="${g.id}">Elimina</button></div>
       </details>`).join('')}</div>` : '<div class="empty"><div class="empty-icon">👨‍👩‍👧</div><p>Nessun genitore registrato.</p><p class="small">I genitori si registrano dall\'app: Altro → Area genitori.</p></div>'}
     <p class="small muted mt">🔒 Anagrafica e contatti dei genitori li vede solo il mister con la password.</p>`;
+  $('#chpin', root).onclick = async () => {
+    const v = prompt('Nuovo PIN genitori (4-8 cifre):', clubPin);
+    if (!v || v === clubPin) return;
+    try { await call(`${API}?action=setcode`, { code: v.trim() }, code); toast('PIN genitori cambiato ✓'); route(); } catch (e) { toast(e.message, 4000); }
+  };
+  $('#sharepin', root).onclick = async () => {
+    const text = `Area genitori dell'app del Calcio Palazzo ⚽\nApri ${location.origin}/ → "Genitore" → registrati.\nPIN genitori della società: ${clubPin}`;
+    try { if (navigator.share) await navigator.share({ text }); else { await navigator.clipboard.writeText(text); toast('Messaggio copiato ✓'); } } catch { /* annullato */ }
+  };
   const act = async (action, body, msg) => { try { await call(`${API}?action=${action}`, body, code); toast(msg); route(); } catch (e) { toast(e.message, 4000); } };
   $$('[data-ok]', root).forEach((b) => (b.onclick = () => { const [parentId, playerId] = b.dataset.ok.split('|'); act('approve', { parentId, playerId }, 'Collegamento confermato ✓'); }));
   $$('[data-no]', root).forEach((b) => (b.onclick = async () => { const [parentId, playerId] = b.dataset.no.split('|'); if (await confirmDialog('Rifiutare la richiesta?', 'Rifiuta', true)) act('reject', { parentId, playerId }, 'Richiesta rifiutata'); }));

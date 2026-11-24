@@ -6,6 +6,7 @@ import { esc, toast, fmtDate, today, $, $$ } from '../util.js';
 import { setHeader, route } from '../app.js';
 import { me } from '../family.js';
 import { publicData } from './board.js';
+import { lineChart } from '../charts.js';
 
 const API = './api/convocazioni';
 export const EV = {
@@ -91,9 +92,26 @@ export async function reportStatsCard(box, playerId) {
     <div class="tiles">${tile('Presenze', s.presenze)}${tile('Titolare', s.titolare)}${tile('Minuti', s.minuti)}
       ${tile('Media min', s.presenze ? Math.round(s.minuti / s.presenze) : 0)}${tile('Gol', s.gol)}${tile('Assist', s.assist)}
       ${s.palo || s.traversa ? tile('Pali / traverse', `${s.palo} / ${s.traversa}`) : ''}${s.infortunio ? tile('Infortuni', s.infortunio) : ''}${s.ammonizione || s.espulsione ? tile('Gialli / rossi', `${s.ammonizione} / ${s.espulsione}`) : ''}</div>
+    <h2 class="section">📈 Andamento stagione</h2>
+    <div class="card"><select id="rsmetric" class="mb">${[['min', 'Minuti giocati'], ['gol', 'Gol'], ['assist', 'Assist']].map(([k, l]) => `<option value="${k}">${l}</option>`).join('')}</select><div id="rschart"></div></div>
+    <h2 class="section">Per 90 minuti</h2>
+    <div class="card"><div class="tiles compact">${tile('Gol / 90′', s.minuti ? (s.gol * 90 / s.minuti).toFixed(2) : '–')}${tile('Assist / 90′', s.minuti ? (s.assist * 90 / s.minuti).toFixed(2) : '–')}${tile('Gol+assist / 90′', s.minuti ? ((s.gol + s.assist) * 90 / s.minuti).toFixed(2) : '–')}</div>
+      ${s.minuti < 90 ? '<p class="small muted mt">Meno di 90 minuti giocati: valori poco indicativi.</p>' : ''}</div>
+    <h2 class="section">Partite</h2>
     <div class="list">${s.partite.map((p) => `<div class="item"><div class="grow"><strong>${esc(p.title)}</strong><div class="muted small">${esc(fmtDate(p.date))} · ${p.starter ? 'titolare' : 'subentrato'}</div></div>
       <span class="small">${ico(p)}</span><span class="min-pill">${p.min}′</span></div>`).join('')}</div>
     <p class="small muted">Dai tabellini compilati dal mister e dai giocatori.</p>`;
+  const chrono = s.partite.slice().reverse();
+  const draw = () => {
+    const k = box.querySelector('#rsmetric').value;
+    box.querySelector('#rschart').innerHTML = lineChart({
+      labels: chrono.map((p) => fmtDate(p.date, { day: '2-digit', month: '2-digit' })),
+      series: [{ name: k === 'min' ? 'Minuti' : k === 'gol' ? 'Gol' : 'Assist', values: chrono.map((p) => p[k] || 0) }],
+      empty: 'Nessuna partita',
+    });
+  };
+  box.querySelector('#rsmetric').onchange = draw;
+  draw();
 }
 
 // ---------- Elenco tabellini (area ragazzi) ----------

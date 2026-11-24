@@ -118,12 +118,13 @@ export async function playerView(root, id) {
       ${tile('Gol', tot.gol)}${tile('Assist', tot.assist)}${tile('Tiri (porta)', `${tot.tiri} (${tot.tiriPorta})`)}
       ${tile('Passaggi', `${tot.passaggiOk}/${tot.passaggi}`)}${tile('Precisione', pct(tot.precisione))}${tile('Recuperi', tot.recuperi)}
       ${tile('Palle perse', tot.perse)}${hasTracking ? tile('Km totali', num(tot.distanza / 1000, 1)) + tile('Vel. max', num(tot.velMax, 1)) : ''}
-    </div>` : `<div class="card small">⏱️ <strong>Presenze, minuti, tiri, passaggi e recuperi</strong> compaiono qui quando registri le partite con <strong>▶ Avvia live</strong> (o inserisci formazione ed eventi a fine partita). Tuttocampo non pubblica questi dati per i singoli giocatori.</div>`}
+    </div>` : ''}
+    <div id="livebox" ${tot.presenze ? '' : 'hidden'}>
 
 
     ${trends.length ? `<h2 class="section">Tendenze ultime 3 partite</h2><div class="list">${trends.map((t) => `<div class="item"><span class="trend ${t.better ? 'up' : 'down'}">${t.better ? '▲' : '▼'}</span><div class="grow">${esc(t.label)}<div class="muted small">${esc(t.text)}</div></div></div>`).join('')}</div>` : ''}
 
-    <h2 class="section">Andamento stagione</h2>
+    <h2 class="section">Andamento stagione (partite live)</h2>
     <div class="card">
       <div class="row gap mb">
         <select id="metric" class="grow">${metricOpts.map((k) => `<option value="${k}">${esc(METRICS[k].label)}</option>`).join('')}</select>
@@ -147,6 +148,7 @@ export async function playerView(root, id) {
         return `<tr onclick="location.hash='#/partita/${r.match.id}'"><td>${shortDate(r.match.date)}</td><td>${esc(r.match.opponent)}</td><td>${Math.round(l.minuti)}</td><td>${l.gol}</td><td>${l.assist}</td><td>${l.tiri}</td><td>${l.passaggiOk}/${l.passaggi}</td><td>${l.recuperi}</td><td>${l.perse}</td>${hasTracking ? `<td>${l.distanza != null ? num(l.distanza) : '–'}</td>` : ''}</tr>`;
       }).join('') || `<tr><td colspan="10" class="muted">Nessuna presenza</td></tr>`}</tbody>
     </table></div>
+    </div>
 
     ${info.length || p.notes ? `<h2 class="section">Profilo</h2><div class="card"><dl class="dl">${info.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>
       ${(p.numberHistory || []).length ? `<p class="small muted mt">Numeri precedenti: ${(p.numberHistory || []).map((h) => `#${esc(h.number)}${h.from || h.to ? ` (${h.from ? 'dal ' + shortDate(h.from) : ''}${h.to ? ' al ' + shortDate(h.to) : ''})` : ''}`).join(', ')}</p>` : ''}

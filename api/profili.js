@@ -34,6 +34,7 @@ async function pipeline(cfg, commands) {
 }
 
 const sha = (s) => crypto.createHash('sha256').update(String(s)).digest('hex');
+const { authPlayer } = require('./_lib.js');
 const pinHash = (id, pin) => sha(`mister-pin:${id}:${pin}`);
 function safeEq(a, b) {
   return crypto.timingSafeEqual(Buffer.from(sha(a)), Buffer.from(sha(b)));
@@ -119,12 +120,17 @@ module.exports = async function handler(req, res) {
       const id = String(body.id || '');
       const pin = String(body.pin || '').trim();
       if (!ID_RE.test(id)) return send(res, 400, { error: 'Giocatore non valido.' });
-      if (!/^\d{4,6}$/.test(pin)) return send(res, 400, { error: 'Il PIN deve avere da 4 a 6 cifre.' });
+      const byParent = pin.startsWith('par:');
+      if (!byParent && !/^\d{4,6}$/.test(pin)) return send(res, 400, { error: 'Il PIN deve avere da 4 a 6 cifre.' });
       if (body.consent !== true) return send(res, 400, { error: 'Devi accettare l\'informativa privacy.' });
       const consent = { version: String(body.privacyVersion || '').slice(0, 20), at: Date.now(), ip: ip(req) };
       if (await limited(cfg, `rl:pin:${id}`, 10, 3600)) return send(res, 429, { error: 'Troppi tentativi con il PIN: riprova tra un\'ora o chiedi al mister di azzerarlo.' });
       const [stored, oldPubRaw] = await pipeline(cfg, [['HGET', 'prof:pin', id], ['HGET', 'prof:pub', id]]);
-      if (stored && !safeEq(stored, pinHash(id, pin))) return send(res, 403, { error: 'PIN errato. Se l\'hai dimenticato chiedi al mister di azzerarlo.' });
+      if (byParent) {
+        const a = await authPlayer(cfg, id, pin);
+        if (a.error) return send(res, a.status, { error: a.error });
+        consent.by = 'genitore:' + a.who.parentId;
+      } else if (stored && !safeEq(stored, pinHash(id, pin))) return send(res, 403, { error: 'PIN errato. Se l\'hai dimenticato chiedi al mister di azzerarlo.' });
       let data;
       try { data = clean(body); } catch (e) { return send(res, 400, { error: e.message }); }
       const oldPub = oldPubRaw ? JSON.parse(oldPubRaw) : {};
@@ -134,21 +140,19 @@ module.exports = async function handler(req, res) {
         ['HSET', 'prof:pub', id, JSON.stringify({ birthDate: data.birthDate || '', hasPhoto, updatedAt: now })],
         ['HSET', 'prof:priv', id, JSON.stringify({ phone: data.phone, email: data.email, updatedAt: now, consent })],
       ];
-      if (!stored) cmds.push(['HSET', 'prof:pin', id, pinHash(id, pin)]);
+      if (!stored && !byParent) cmds.push(['HSET', 'prof:pin', id, pinHash(id, pin)]);
       if (data.photo) cmds.push(['HSET', 'prof:photo', id, data.photo]);
       if (data.photo === '') cmds.push(['HDEL', 'prof:photo', id]);
       await pipeline(cfg, cmds);
-      return send(res, 200, { ok: true, newPin: !stored });
+      return send(res, 200, { ok: true, newPin: !stored && !byParent });
     }
 
     if (req.method === 'POST' && action === 'mine') {
       // il giocatore, con il suo PIN, legge i propri dati (per la scheda PDF)
       const { id, pin } = await readBody(req);
-      if (!ID_RE.test(String(id)) || !/^\d{4,6}$/.test(String(pin || ''))) return send(res, 400, { error: 'PIN non valido.' });
-      if (await limited(cfg, `rl:pin:${id}`, 10, 3600)) return send(res, 429, { error: 'Troppi tentativi con il PIN: riprova tra un\'ora.' });
-      const [stored, priv] = await pipeline(cfg, [['HGET', 'prof:pin', id], ['HGET', 'prof:priv', id]]);
-      if (!stored) return send(res, 404, { error: 'Prima compila la tua scheda e scegli un PIN.' });
-      if (!safeEq(stored, pinHash(id, String(pin)))) return send(res, 403, { error: 'PIN errato.' });
+      const a = await authPlayer(cfg, id, pin);
+      if (a.error) return send(res, a.status, { error: a.error });
+      const [priv] = await pipeline(cfg, [['HGET', 'prof:priv', id]]);
       return send(res, 200, { priv: priv ? JSON.parse(priv) : {} });
     }
 
@@ -157,10 +161,8 @@ module.exports = async function handler(req, res) {
       const { id, pin } = await readBody(req);
       if (!ID_RE.test(String(id))) return send(res, 400, { error: 'Id non valido' });
       if (!isAdmin(req)) {
-        if (!/^\d{4,6}$/.test(String(pin || ''))) return send(res, 400, { error: 'PIN non valido.' });
-        if (await limited(cfg, `rl:pin:${id}`, 10, 3600)) return send(res, 429, { error: 'Troppi tentativi con il PIN.' });
-        const [stored] = await pipeline(cfg, [['HGET', 'prof:pin', id]]);
-        if (!stored || !safeEq(stored, pinHash(id, String(pin)))) return send(res, 403, { error: 'PIN errato.' });
+        const a = await authPlayer(cfg, id, pin);
+        if (a.error) return send(res, a.status, { error: a.error });
       }
       await pipeline(cfg, [['HDEL', 'prof:pub', id], ['HDEL', 'prof:photo', id], ['HDEL', 'prof:priv', id], ['HDEL', 'prof:pin', id]]);
       return send(res, 200, { ok: true });

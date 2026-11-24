@@ -2,7 +2,7 @@
 // Le parti tra [parentesi quadre] vanno completate dalla società prima dell'uso definitivo.
 import { sheet } from './util.js';
 
-export const PRIVACY_VERSION = '2026-11-23';
+export const PRIVACY_VERSION = '2026-11-24';
 
 export const PRIVACY_HTML = `
 <div class="privacy">
@@ -19,7 +19,11 @@ export const PRIVACY_HTML = `
 <li><strong>Messaggi</strong> scritti in risposta agli avvisi della bacheca.</li>
 <li><strong>Video delle partite</strong> girati dalla Società o dai suoi incaricati, usati solo per l'analisi tecnica.</li>
 </ul>
-<p>Non trattiamo dati relativi alla salute tramite l'app.</p>
+<ul>
+<li><strong>Dati dei genitori</strong> che si registrano: nome, cognome, codice fiscale, data di nascita, cellulare, e-mail, indirizzo e collegamento ai figli.</li>
+<li><strong>Documenti</strong> caricati da giocatori o genitori: documento d'identità, <strong>certificato medico di idoneità sportiva</strong> (dato relativo alla salute, art. 9 GDPR, trattato solo per verificare l'idoneità richiesta dalle norme sportive) e altri documenti.</li>
+<li><strong>Pagamenti</strong>: modalità scelta, rate pagate, ricevute caricate e <strong>dati per la fattura</strong> (intestatario, codice fiscale o partita IVA, indirizzo, e-mail/PEC, codice SDI).</li>
+</ul>
 
 <h4>3. Perché li trattiamo (finalità e base giuridica)</h4>
 <ul>
@@ -31,7 +35,8 @@ export const PRIVACY_HTML = `
 <h4>4. Chi vede i dati</h4>
 <ul>
 <li><strong>Visibili nell'app a chi ha il link</strong> (giocatori, genitori, staff): nome, squadra, ruolo, numero di maglia, foto, data di nascita, statistiche sportive, presenze e messaggi in bacheca.</li>
-<li><strong>Visibili solo agli allenatori e ai dirigenti della Società</strong> (accesso con password): cellulare, e-mail, link ai video, risposte alle convocazioni e ai motivi di assenza.</li>
+<li><strong>Visibili solo al giocatore, ai genitori collegati e agli allenatori/dirigenti della Società</strong>: documenti, certificato medico, pagamenti, ricevute e dati per la fattura.</li>
+<li><strong>Visibili solo agli allenatori e ai dirigenti della Società</strong> (accesso con password): dati dei genitori, cellulare, e-mail, link ai video, risposte alle convocazioni e ai motivi di assenza.</li>
 <li>I dati non vengono venduti né ceduti a terzi per scopi commerciali.</li>
 </ul>
 

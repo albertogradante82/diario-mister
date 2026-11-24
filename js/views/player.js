@@ -58,16 +58,17 @@ export async function playerCalendarView(root) {
     const withMatches = d.teams.filter((t) => d.matches.some((m) => m.teamId === t.id));
     const draw = () => {
       const pick = teamPicker(withMatches, color, { all: true });
-      const mode = sessionStorage.getItem('pMode') || 'prossime';
       const td = today();
-      let list = d.matches.filter((m) => pick.sel === 'tutte' || m.teamId === pick.sel);
-      list = mode === 'prossime' ? list.filter((m) => !m.played && m.date >= td) : list.filter((m) => m.played || m.date < td);
-      list.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time) * (mode === 'prossime' ? 1 : -1));
+      const all = d.matches.filter((m) => pick.sel === 'tutte' || m.teamId === pick.sel);
+      const played = (m) => m.played || m.date < td;
+      const asc = (a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || ''));
+      // prima le partite da giocare (dalla prossima in avanti), poi una linea e quelle giocate (dalla più recente)
+      const todo = all.filter((m) => !played(m)).sort(asc);
+      const done = all.filter(played).sort((a, b) => asc(b, a));
       const tname = Object.fromEntries(d.teams.map((t) => [t.id, t.name]));
       root.innerHTML = `
-        <div class="seg">${[['prossime', 'Prossime'], ['risultati', 'Risultati']].map(([k, l]) => `<label><input type="radio" name="pm" value="${k}" ${k === mode ? 'checked' : ''}><span>${l}</span></label>`).join('')}</div>
         ${pick.html}
-        ${list.length ? `<div class="list">${list.map((m) => {
+        ${todo.length || done.length ? [[todo, `📅 Da giocare · ${todo.length}`], [done, `✅ Partite giocate · ${done.length}`]].filter(([l]) => l.length).map(([list, title], gi) => `${gi || !todo.length ? `<div class="played-line"><span>${title}</span></div>` : `<h2 class="section">${title}</h2>`}<div class="list">${list.map((m) => {
           const res = m.played && m.goalsFor != null ? (m.home === false ? `${m.goalsAgainst} – ${m.goalsFor}` : `${m.goalsFor} – ${m.goalsAgainst}`) : '';
           const out = res ? (m.goalsFor > m.goalsAgainst ? 'win' : m.goalsFor === m.goalsAgainst ? 'draw' : 'loss') : '';
           return `<div class="item"><span class="team-bar" style="background:${color[m.teamId]}"></span>
@@ -77,8 +78,7 @@ export async function playerCalendarView(root) {
               <div class="muted small">${m.moved && !m.played ? '<b class="warn">🔄 spostata</b> · ' : ''}${m.time ? 'ore ' + esc(m.time) + ' · ' : ''}${m.home === false ? 'trasferta' : 'in casa'}${m.round ? ' · ' + esc(m.round) : ''}</div>
               ${m.scorers && m.scorers.length ? `<div class="small">⚽ ${m.scorers.map(esc).join(', ')}</div>` : ''}</div>
             ${res ? `<span class="score ${out}">${res}</span>` : ''}</div>`;
-        }).join('')}</div>` : `<div class="empty"><p>${mode === 'prossime' ? 'Nessuna partita in programma.' : 'Nessun risultato ancora.'}</p></div>`}`;
-      root.querySelectorAll('input[name=pm]').forEach((i) => (i.onchange = () => { sessionStorage.setItem('pMode', i.value); draw(); }));
+        }).join('')}</div>`).join('') : '<div class="empty"><p>Nessuna partita.</p></div>'}`;
       bindPicker(root, draw);
     };
     draw();
@@ -308,6 +308,9 @@ export async function playerProfileEditView(root, id) {
 export async function playerMoreView(root) {
   setHeader({ title: 'Altro' });
   root.innerHTML = `<div class="list">
+    <a class="item" href="#/g/genitore"><span style="font-size:24px">👨‍👩‍👧</span><div class="grow"><strong>Area genitori</strong><div class="muted small">Registrati e collegati ai tuoi figli</div></div><span class="chev">›</span></a>
+    <a class="item" href="#/g/documenti"><span style="font-size:24px">📄</span><div class="grow"><strong>Documenti</strong><div class="muted small">Documento d'identità, certificato medico, altri</div></div><span class="chev">›</span></a>
+    <a class="item" href="#/g/pagamenti"><span style="font-size:24px">💶</span><div class="grow"><strong>Pagamenti e fattura</strong><div class="muted small">Quota, rate, ricevute, richiesta fattura</div></div><span class="chev">›</span></a>
     <a class="item" href="#/g/rose"><span style="font-size:24px">👥</span><div class="grow"><strong>Squadre e schede giocatori</strong><div class="muted small">Rose con foto · compila la tua scheda</div></div><span class="chev">›</span></a>
     <a class="item" href="#/g/marcatori"><span style="font-size:24px">🏆</span><div class="grow"><strong>Classifiche e marcatori</strong><div class="muted small">Campionati e classifica di tutte le giovanili</div></div><span class="chev">›</span></a>
     <button class="item" id="instApp"><span style="font-size:24px">📲</span><div class="grow"><strong>Aggiungi alla Home (consigliato)</strong><div class="muted small">Icona con lo stemma sulla schermata Home</div></div><span class="chev">›</span></button>

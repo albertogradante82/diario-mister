@@ -38,7 +38,12 @@ export async function matchesView(root) {
     return;
   }
   const res = { v: 0, n: 0, p: 0 };
-  const items = ctx.matches.map((m) => {
+  // prima le partite da giocare (dalla prossima in avanti), poi una linea e quelle giocate (dalla più recente)
+  const isDone = (m) => m.status === 'finita';
+  const key = (m) => (m.date || '') + (m.time || '');
+  const todo = ctx.matches.filter((m) => !isDone(m)).sort((a, b) => key(a).localeCompare(key(b)));
+  const done = ctx.matches.filter(isDone).sort((a, b) => key(b).localeCompare(key(a)));
+  const row = (m) => {
     const ev = ctx.eventsByMatch[m.id] || [];
     const s = score(ev);
     const done = m.status === 'finita';
@@ -51,11 +56,13 @@ export async function matchesView(root) {
         <div class="muted small">${esc(m.competition || '')}${m.round ? ' · ' + esc(m.round) : ''}${m.time ? ' · ' + esc(m.time) : ''}${(ctx.trackingByMatch[m.id] || []).length ? ' · 📡 tracking' : ''}</div></div>
       ${live ? '<span class="badge live">LIVE</span>' : done || ev.length ? `<span class="score ${out}">${scoreLabel(m, s)}</span>` : '<span class="badge">da giocare</span>'}
     </a>`;
-  });
+  };
+  const todoHtml = todo.map(row), doneHtml = done.map(row);
   root.innerHTML = `
     <a class="btn block mb" href="#/calendario">📆 Calendario di tutte le squadre</a>
     <div class="record"><span class="win">${res.v} V</span><span class="draw">${res.n} N</span><span class="loss">${res.p} P</span></div>
-    <div class="list">${items.join('')}</div>`;
+    ${todoHtml.length ? `<h2 class="section">📅 Da giocare · ${todoHtml.length}</h2><div class="list">${todoHtml.join('')}</div>` : ''}
+    ${doneHtml.length ? `<div class="played-line"><span>✅ Partite giocate · ${doneHtml.length}</span></div><div class="list">${doneHtml.join('')}</div>` : ''}`;
 }
 
 // ---------- Nuova / modifica partita ----------

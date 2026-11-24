@@ -92,15 +92,16 @@ export async function playerBoardView(root) {
 
   root.innerHTML = `
     ${mine ? `<div class="card small row gap center"><span class="avatar" style="width:36px;height:36px" data-rphoto="${mine.id}">${esc(mine.name.split(' ').map((w) => w[0]).join('').slice(0, 2))}</span>
-        <div class="grow">Sei <strong>${esc(mine.name)}</strong><div class="muted">Puoi rispondere ai messaggi del mister · il mister vede chi ha letto ✓</div></div>
+        <div class="grow">${ident.parent ? `👨‍👩‍👧 Genitore di <strong>${esc(mine.name)}</strong><div class="muted">Rispondi al mister a nome tuo · il mister vede chi ha letto ✓</div>` : `Sei <strong>${esc(mine.name)}</strong><div class="muted">Puoi rispondere ai messaggi del mister · il mister vede chi ha letto ✓</div>`}</div>
         <button class="btn-text small" id="unlink">Cambia</button></div>`
       : `<div class="card small"><strong>Chi sei?</strong> Collega il tuo profilo per vedere la bacheca della tua squadra, rispondere al mister e ricevere convocazioni.
         <button class="btn primary block mt" id="link">🔗 Collega il mio profilo</button>
-        <p class="muted mt">Serve aver compilato la tua scheda giocatore (Altro → Squadre → il tuo nome) e il tuo PIN.</p></div>`}
+        <p class="muted mt">Serve aver compilato la tua scheda giocatore (Altro → Squadre → il tuo nome) e il tuo PIN.</p>
+        <a class="btn block mt" href="#/g/genitore">👨‍👩‍👧 Sono un genitore</a></div>`}
     <div class="chips mb">${groups.map(([id, name]) => `<button class="chip-btn ${id === sel ? 'on' : ''}" data-g="${id}">${esc(name)}${unreadIn(id) ? ` <span class="chip-dot">${unreadIn(id)}</span>` : ''}</button>`).join('')}</div>
     ${list.length ? list.map((n) => noticeCard(n, {
       unread: !s.has(n.id),
-      replyBox: mine ? `<form class="reply-form" data-rf="${n.id}"><input name="t" maxlength="500" placeholder="Rispondi come ${esc(mine.name)}…" autocomplete="off"><button class="btn small primary">Invia</button></form>` : '',
+      replyBox: mine ? `<form class="reply-form" data-rf="${n.id}"><input name="t" maxlength="500" placeholder="Rispondi come ${ident.parent ? 'genitore di ' : ''}${esc(mine.name)}…" autocomplete="off"><button class="btn small primary">Invia</button></form>` : '',
     })).join('') : '<div class="empty"><div class="empty-icon">📣</div><p>Nessun messaggio in questa bacheca.</p></div>'}`;
   fillPhotos(root);
 
@@ -144,7 +145,7 @@ export async function playerBoardView(root) {
   }
 
   const ul = $('#unlink', root);
-  if (ul) ul.onclick = () => { localStorage.removeItem('mister-me'); route(); };
+  if (ul) ul.onclick = () => { if (ident.parent) { location.hash = '#/g/genitore'; return; } localStorage.removeItem('mister-me'); route(); };
   const lk = $('#link', root);
   if (lk) lk.onclick = () => linkProfile(pub);
   return () => io && io.disconnect();
@@ -155,9 +156,13 @@ export async function playerPushSheet() {
   const P = await import('../push.js');
   return P.pushSheet(async () => {
     const ident = me();
-    if (!ident) { toast('Prima collega il tuo profilo dalla Bacheca.', 4000); return null; }
+    if (!ident) { toast('Prima collega il tuo profilo dalla Bacheca (o entra nell\'Area genitori).', 4000); return null; }
+    if (ident.parent) {
+      const par = JSON.parse(localStorage.getItem('mister-parent') || 'null');
+      return par ? { parentId: par.id, parentPin: par.pin } : null;
+    }
     return { playerId: ident.id, pin: ident.pin };
-  }, 'convocazioni, presenze allenamenti, messaggi in bacheca, cambi di orario e annullamenti');
+  }, 'convocazioni, presenze allenamenti, messaggi in bacheca, cambi di orario, annullamenti e pagamenti');
 }
 
 export async function linkProfile(pub) {

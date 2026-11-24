@@ -1,7 +1,7 @@
 // Iscrizione alle notifiche: giocatori verificati (con PIN) e mister (con password).
 //
 // Redis: push:subs  hash sha(endpoint) -> JSON { sub, role: 'giocatore'|'mister', playerId, teamId, at }
-const { redisConfig, pipeline, sha, pinHash, safeEq, isAdmin, ip, send, readBody, limited } = require('./_lib.js');
+const { redisConfig, pipeline, sha, isAdmin, ip, send, readBody, limited, authPlayer, parPinHash, safeEq, roster } = require('./_lib.js');
 const { vapidKeys, notify } = require('./_push.js');
 
 const PID = /^imp-[0-9a-f]{16}$/;
@@ -38,10 +38,17 @@ module.exports = async function handler(req, res) {
       if (b.role === 'mister') {
         if (!isAdmin(req)) return send(res, 401, { error: 'Password amministratore errata.' });
         rec = { role: 'mister', playerId: '', teamId: '' };
+      } else if (b.parentId) {
+        // genitore: riceve le notifiche di tutti i figli collegati
+        if (!/^g-[0-9a-f]{16}$/.test(String(b.parentId)) || !/^\d{4,6}$/.test(String(b.parentPin || ''))) return send(res, 400, { error: 'Accedi prima come genitore.' });
+        const [stored, raw] = await pipeline(cfg, [['HGET', 'par:pin', b.parentId], ['HGET', 'par:list', b.parentId]]);
+        if (!stored || !raw || !safeEq(stored, parPinHash(b.parentId, String(b.parentPin)))) return send(res, 403, { error: 'PIN errato.' });
+        const kids = JSON.parse(raw).children.filter((c) => c.status === 'ok').map((c) => c.playerId);
+        const r = await roster(req);
+        rec = { role: 'genitore', parentId: b.parentId, playerId: '', teamId: '', players: kids, teams: [...new Set(kids.map((k) => r.players[k]?.teamId).filter(Boolean))] };
       } else {
-        if (!PID.test(String(b.playerId)) || !/^\d{4,6}$/.test(String(b.pin || ''))) return send(res, 400, { error: 'Collega prima il tuo profilo.' });
-        const [stored] = await pipeline(cfg, [['HGET', 'prof:pin', b.playerId]]);
-        if (!stored || !safeEq(stored, pinHash(b.playerId, String(b.pin)))) return send(res, 403, { error: 'PIN errato.' });
+        const a = await authPlayer(cfg, b.playerId, b.pin);
+        if (a.error) return send(res, a.status, { error: a.error });
         rec = { role: 'giocatore', playerId: b.playerId, teamId: await teamOf(req, b.playerId) };
       }
       const key = sha(b.sub.endpoint);

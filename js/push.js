@@ -46,8 +46,9 @@ export async function enablePush(who) {
   sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64uToBytes(publicKey) });
   const json = sub.toJSON();
   if (who.role === 'mister') await call('subscribe', { role: 'mister', sub: json }, { 'x-admin-code': who.adminCode });
+  else if (who.parentId) await call('subscribe', { parentId: who.parentId, parentPin: who.parentPin, sub: json });
   else await call('subscribe', { playerId: who.playerId, pin: who.pin, sub: json });
-  localStorage.setItem('mister-push', who.role === 'mister' ? 'mister' : who.playerId);
+  localStorage.setItem('mister-push', who.role === 'mister' ? 'mister' : who.parentId || who.playerId);
 }
 
 export async function disablePush() {

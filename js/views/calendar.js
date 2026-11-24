@@ -17,13 +17,13 @@ export async function calendarView(root) {
   seasons.forEach((s) => { if (!latest[s.teamId] || s.name > latest[s.teamId].name) latest[s.teamId] = s; });
   const current = matches.filter((m) => latest[m.teamId] && m.seasonId === latest[m.teamId].id && teamById[m.teamId]);
 
-  let filter = sessionStorage.getItem('calFilter') || 'prossime';
+  let filter = sessionStorage.getItem('calFilter') || 'tutte';
   let teamSel = JSON.parse(sessionStorage.getItem('calTeams') || 'null');
   const teamsWithMatches = teams.filter((t) => current.some((m) => m.teamId === t.id)).sort((a, b) => a.name.localeCompare(b.name));
   if (!teamSel) teamSel = teamsWithMatches.map((t) => t.id);
 
   root.innerHTML = `
-    <div class="seg">${[['prossime', 'Prossime'], ['giocate', 'Giocate'], ['tutte', 'Tutte']].map(([k, l]) =>
+    <div class="seg">${[['tutte', 'Tutte'], ['prossime', 'Prossime'], ['giocate', 'Giocate']].map(([k, l]) =>
       `<label><input type="radio" name="cf" value="${k}" ${k === filter ? 'checked' : ''}><span>${l}</span></label>`).join('')}</div>
     <div class="chips mb">${teamsWithMatches.map((t) => `<button class="chip-btn ${teamSel.includes(t.id) ? 'on' : ''}" data-t="${t.id}" style="${teamSel.includes(t.id) ? `background:${color[t.id]};border-color:${color[t.id]}` : ''}">${esc(t.name)}</button>`).join('')}</div>
     <div id="cal"></div>`;
@@ -33,13 +33,19 @@ export async function calendarView(root) {
     let list = current.filter((m) => teamSel.includes(m.teamId));
     if (filter === 'prossime') list = list.filter((m) => (m.date || '') >= td && m.status !== 'finita');
     if (filter === 'giocate') list = list.filter((m) => m.status === 'finita' || (m.date || '') < td);
-    list.sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || '')) * (filter === 'giocate' ? -1 : 1));
+    const played = (m) => m.status === 'finita' || (m.date || '') < td;
+    const asc = (a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || ''));
+    if (filter === 'tutte') list = [...list.filter((m) => !played(m)).sort(asc), ...list.filter(played).sort((a, b) => asc(b, a))];
+    else list.sort((a, b) => asc(a, b) * (filter === 'giocate' ? -1 : 1));
     const days = [];
+    let lineDone = false;
     list.forEach((m) => {
       const last = days[days.length - 1];
-      if (last && last.date === m.date) last.items.push(m); else days.push({ date: m.date, items: [m] });
+      const line = filter === 'tutte' && played(m) && !lineDone;
+      if (line) lineDone = true;
+      if (!line && last && last.date === m.date) last.items.push(m); else days.push({ date: m.date, items: [m], line });
     });
-    $('#cal', root).innerHTML = days.length ? days.map((d) => `
+    $('#cal', root).innerHTML = days.length ? days.map((d) => `${d.line ? '<div class="played-line"><span>✅ Partite giocate</span></div>' : ''}
       <h2 class="section">${esc(fmtDate(d.date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }))}${d.date === td ? ' · oggi' : ''}</h2>
       <div class="list">${d.items.map((m) => {
         const t = teamById[m.teamId];

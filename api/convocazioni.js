@@ -4,7 +4,7 @@
 //   conv:list        hash convId -> JSON convocazione
 //   conv:resp:<id>   hash playerId -> JSON { r: 'si'|'no', note, at }
 const crypto = require('crypto');
-const { redisConfig, pipeline, pinHash, safeEq, isAdmin, ip, send, readBody, limited, hashToObj } = require('./_lib.js');
+const { redisConfig, pipeline, isAdmin, ip, send, readBody, limited, hashToObj, authPlayer } = require('./_lib.js');
 const { notify, quando } = require('./_push.js');
 
 const PID = /^imp-[0-9a-f]{16}$/;
@@ -12,12 +12,8 @@ const CID = /^c-[0-9a-f]{16}$/;
 const str = (v, max) => String(v ?? '').trim().slice(0, max);
 
 async function checkPin(cfg, playerId, pin) {
-  if (!PID.test(String(playerId)) || !/^\d{4,6}$/.test(String(pin || ''))) return 'PIN non valido.';
-  if (await limited(cfg, `rl:pin:${playerId}`, 40, 3600)) return 'Troppi tentativi con il PIN: riprova tra un\'ora.';
-  const [stored] = await pipeline(cfg, [['HGET', 'prof:pin', playerId]]);
-  if (!stored) return 'Prima compila la tua scheda giocatore.';
-  if (!safeEq(stored, pinHash(playerId, String(pin)))) return 'PIN errato.';
-  return null;
+  const a = await authPlayer(cfg, playerId, pin);
+  return a.error || null;
 }
 
 module.exports = async function handler(req, res) {

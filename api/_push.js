@@ -75,8 +75,10 @@ async function notify(cfg, filter, payload) {
       if (filter.mister) return s.role === 'mister';
       if (s.role === 'mister') return false;
       if (filter.all) return true;
-      if (filter.players && filter.players.includes(s.playerId)) return true;
-      if (filter.teams && filter.teams.includes(s.teamId)) return true;
+      const ps = [s.playerId, ...(s.players || [])].filter(Boolean);
+      const ts = [s.teamId, ...(s.teams || [])].filter(Boolean);
+      if (filter.players && ps.some((p) => filter.players.includes(p))) return true;
+      if (filter.teams && ts.some((t) => filter.teams.includes(t))) return true;
       return false;
     });
     if (!targets.length) return 0;

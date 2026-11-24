@@ -26,10 +26,12 @@ export async function roleChoiceView(root) {
       <p class="muted">Diario del Mister · stagione ${esc(defaultSeasonName())}</p>
     </div>
     <p class="small muted center-text mb">Chi sei?</p>
-    <button class="choice choice-main" id="asPlayer"><span class="choice-icon">🏃</span><span><strong>Giocatore o genitore</strong><small>Avvisi della società, calendario, risultati, rose e classifiche.</small></span></button>
+    <button class="choice choice-main" id="asPlayer"><span class="choice-icon">🏃</span><span><strong>Giocatore</strong><small>Avvisi della società, convocazioni, calendario, risultati, rose e classifiche.</small></span></button>
+    <button class="choice" id="asParent"><span class="choice-icon">👨‍👩‍👧</span><span><strong>Genitore</strong><small>Registrati, collegati ai tuoi figli: bacheca, convocazioni, documenti e pagamenti.</small></span></button>
     <button class="choice" id="asMister"><span class="choice-icon">📋</span><span><strong>Mister / dirigente</strong><small>Gestione completa: partite live, statistiche, giocatori. Serve la password.</small></span></button>
     <button class="choice choice-install" id="instApp"><span class="choice-icon">📲</span><span><strong>Aggiungi alla Home (consigliato)</strong><small>L'icona con lo stemma sul telefono: app a schermo intero e notifiche.</small></span></button>`;
   if ($('#instApp', root)) $('#instApp', root).onclick = installApp;
+  $('#asParent', root).onclick = () => { setRole('giocatore'); location.hash = '#/g/genitore'; route(); };
   $('#asPlayer', root).onclick = () => { setRole('giocatore'); location.hash = '#/g/bacheca'; route(); };
   $('#asMister', root).onclick = async () => {
     const data = await misterLogin();

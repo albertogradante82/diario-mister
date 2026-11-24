@@ -5,7 +5,7 @@
 //   avv:read:<id>   hash playerId -> timestamp lettura
 //   avv:rep:<id>    lista JSON risposte { rid, playerId, name, text, at, mister }
 const crypto = require('crypto');
-const { redisConfig, pipeline, pinHash, safeEq, isAdmin, ip, send, readBody, limited, hashToObj } = require('./_lib.js');
+const { redisConfig, pipeline, isAdmin, ip, send, readBody, limited, hashToObj, authPlayer } = require('./_lib.js');
 const { notify, quando } = require('./_push.js');
 
 const PID = /^imp-[0-9a-f]{16}$/;
@@ -45,11 +45,10 @@ module.exports = async function handler(req, res) {
     if (req.method === 'POST' && action === 'read') {
       if (await limited(cfg, `rl:read:${ip(req)}`, 200, 3600)) return send(res, 429, { error: 'Troppe richieste.' });
       const { avvisoId, playerId, pin } = await readBody(req);
-      if (!AID.test(String(avvisoId)) || !PID.test(String(playerId)) || !/^\d{4,6}$/.test(String(pin || ''))) return send(res, 400, { error: 'Dati non validi.' });
-      if (await limited(cfg, `rl:pin:${playerId}`, 30, 3600)) return send(res, 429, { error: 'Troppi tentativi con il PIN.' });
-      const [stored, exists] = await pipeline(cfg, [['HGET', 'prof:pin', playerId], ['HEXISTS', 'avv:list', avvisoId]]);
-      if (!stored) return send(res, 404, { error: 'Profilo non verificato.' });
-      if (!safeEq(stored, pinHash(playerId, String(pin)))) return send(res, 403, { error: 'PIN errato.' });
+      if (!AID.test(String(avvisoId))) return send(res, 400, { error: 'Dati non validi.' });
+      const a = await authPlayer(cfg, playerId, pin);
+      if (a.error) return send(res, a.status, { error: a.error });
+      const [exists] = await pipeline(cfg, [['HEXISTS', 'avv:list', avvisoId]]);
       if (!Number(exists)) return send(res, 404, { error: 'Avviso non trovato.' });
       await pipeline(cfg, [['HSETNX', `avv:read:${avvisoId}`, playerId, String(Date.now())]]);
       return send(res, 200, { ok: true });
@@ -60,12 +59,14 @@ module.exports = async function handler(req, res) {
       if (await limited(cfg, `rl:rep:${ip(req)}`, 60, 3600)) return send(res, 429, { error: 'Troppe risposte, riprova più tardi.' });
       const { avvisoId, playerId, pin, text } = await readBody(req);
       const t = String(text || '').trim().slice(0, 500);
-      if (!AID.test(String(avvisoId)) || !PID.test(String(playerId)) || !/^\d{4,6}$/.test(String(pin || '')) || !t) return send(res, 400, { error: 'Scrivi un messaggio.' });
-      if (await limited(cfg, `rl:pin:${playerId}`, 30, 3600)) return send(res, 429, { error: 'Troppi tentativi con il PIN.' });
-      const [stored, raw] = await pipeline(cfg, [['HGET', 'prof:pin', playerId], ['HGET', 'avv:list', avvisoId]]);
-      if (!stored || !safeEq(stored, pinHash(playerId, String(pin)))) return send(res, 403, { error: 'Profilo non verificato o PIN errato.' });
+      if (!AID.test(String(avvisoId)) || !t) return send(res, 400, { error: 'Scrivi un messaggio.' });
+      const a = await authPlayer(cfg, playerId, pin);
+      if (a.error) return send(res, a.status, { error: a.error });
+      const [raw] = await pipeline(cfg, [['HGET', 'avv:list', avvisoId]]);
       if (!raw) return send(res, 404, { error: 'Avviso non trovato.' });
-      const name = await playerName(req, playerId);
+      const child = await playerName(req, playerId);
+      // il nome viene dalla rosa ufficiale (o dal profilo del genitore), non dal telefono
+      const name = a.who.role === 'genitore' ? `${a.who.name} (genitore di ${child})` : child;
       const rep = { rid: crypto.randomBytes(6).toString('hex'), playerId, name, text: t, at: Date.now() };
       await pipeline(cfg, [['RPUSH', `avv:rep:${avvisoId}`, JSON.stringify(rep)], ['HSETNX', `avv:read:${avvisoId}`, playerId, String(Date.now())]]);
       await notify(cfg, { mister: true }, { title: `💬 ${rep.name}`, body: rep.text.slice(0, 180), url: './#/bacheca', tag: 'rep-' + avvisoId });
@@ -75,12 +76,9 @@ module.exports = async function handler(req, res) {
     if (req.method === 'POST' && action === 'verify') {
       // collega il telefono al proprio profilo (verifica del PIN)
       const { playerId, pin } = await readBody(req);
-      if (!PID.test(String(playerId)) || !/^\d{4,6}$/.test(String(pin || ''))) return send(res, 400, { error: 'PIN non valido.' });
-      if (await limited(cfg, `rl:pin:${playerId}`, 30, 3600)) return send(res, 429, { error: 'Troppi tentativi con il PIN: riprova tra un\'ora.' });
-      const [stored] = await pipeline(cfg, [['HGET', 'prof:pin', playerId]]);
-      if (!stored) return send(res, 404, { error: 'Prima compila la tua scheda giocatore e scegli un PIN.' });
-      if (!safeEq(stored, pinHash(playerId, String(pin)))) return send(res, 403, { error: 'PIN errato.' });
-      return send(res, 200, { ok: true });
+      const a = await authPlayer(cfg, playerId, pin);
+      if (a.error) return send(res, a.status, { error: a.error });
+      return send(res, 200, { ok: true, role: a.who.role });
     }
 
     // ---- solo amministratore ----

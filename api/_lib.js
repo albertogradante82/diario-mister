@@ -52,4 +52,48 @@ const hashToObj = (arr) => {
   return o;
 };
 
-module.exports = { redisConfig, pipeline, sha, pinHash, safeEq, isAdmin, ip, send, readBody, limited, hashToObj };
+const parPinHash = (id, pin) => sha(`mister-par-pin:${id}:${pin}`);
+const PLAYER_ID = /^imp-[0-9a-f]{16}$/;
+const PAR_PIN = /^par:(g-[0-9a-f]{16}):(\d{4,6})$/;
+
+/**
+ * Chi agisce per un giocatore: il giocatore con il suo PIN, oppure un genitore collegato
+ * (in quel caso il "pin" è "par:<idGenitore>:<pinGenitore>").
+ * Restituisce { who } oppure { error, status }.
+ */
+async function authPlayer(cfg, playerId, pin) {
+  pin = String(pin || '');
+  if (!PLAYER_ID.test(String(playerId))) return { error: 'Giocatore non valido.', status: 400 };
+  const m = pin.match(PAR_PIN);
+  if (m) {
+    const [, gid, gpin] = m;
+    if (await limited(cfg, `rl:gpin:${gid}`, 60, 3600)) return { error: 'Troppi tentativi con il PIN: riprova tra un\'ora.', status: 429 };
+    const [stored, raw] = await pipeline(cfg, [['HGET', 'par:pin', gid], ['HGET', 'par:list', gid]]);
+    if (!stored || !raw || !safeEq(stored, parPinHash(gid, gpin))) return { error: 'PIN del genitore errato.', status: 403 };
+    const g = JSON.parse(raw);
+    if (!(g.children || []).some((c) => c.playerId === playerId && c.status === 'ok')) return { error: 'Questo giocatore non è ancora collegato al tuo profilo genitore (in attesa di conferma del mister).', status: 403 };
+    return { who: { role: 'genitore', parentId: gid, name: `${g.firstName} ${g.lastName}`.trim() } };
+  }
+  if (!/^\d{4,6}$/.test(pin)) return { error: 'PIN non valido.', status: 400 };
+  if (await limited(cfg, `rl:pin:${playerId}`, 30, 3600)) return { error: 'Troppi tentativi con il PIN: riprova tra un\'ora.', status: 429 };
+  const [stored] = await pipeline(cfg, [['HGET', 'prof:pin', playerId]]);
+  if (!stored) return { error: 'Prima compila la tua scheda giocatore e scegli un PIN.', status: 404 };
+  if (!safeEq(stored, pinHash(playerId, pin))) return { error: 'PIN errato.', status: 403 };
+  return { who: { role: 'giocatore' } };
+}
+
+/** Nomi dei giocatori e squadre dal file pubblico (con cache di 10 minuti). */
+let rosterCache = null, rosterAt = 0;
+async function roster(req) {
+  if (rosterCache && Date.now() - rosterAt < 600000) return rosterCache;
+  try {
+    const host = req.headers['x-forwarded-host'] || req.headers.host;
+    const proto = /^(localhost|127\.)/.test(host) ? 'http' : 'https';
+    const d = await (await fetch(`${proto}://${host}/dati/pubblico.json`)).json();
+    rosterCache = { players: Object.fromEntries(d.players.map((p) => [p.id, p])), teams: Object.fromEntries(d.teams.map((t) => [t.id, t])) };
+    rosterAt = Date.now();
+  } catch { if (!rosterCache) rosterCache = { players: {}, teams: {} }; }
+  return rosterCache;
+}
+
+module.exports = { redisConfig, pipeline, sha, pinHash, parPinHash, safeEq, isAdmin, ip, send, readBody, limited, hashToObj, authPlayer, roster };

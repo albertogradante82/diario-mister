@@ -12,6 +12,9 @@ import { playerBoardView, misterBoardView, updateBadge } from './views/board.js'
 import { misterConvView, playerConvView } from './views/convocazioni.js';
 import { videoListView } from './views/video.js';
 import { staffView, playerStaffView } from './views/staff.js';
+import { parentAreaView, misterParentsView } from './views/parents.js';
+import { playerDocsView, misterDocsView } from './views/docs.js';
+import { playerPaymentsView, misterPaymentsView } from './views/payments.js';
 import { playerCalendarView, playerRosterView, playerScorersView, playerProfileView, playerProfileEditView, playerMoreView } from './views/player.js';
 import { roleChoiceView, autoUpdateClubData } from './views/more.js';
 import { getRole, logout } from './roles.js';
@@ -108,6 +111,9 @@ const routes = [
   [/^#\/allenamenti$/, misterConvView('allenamento'), 'home'],
   [/^#\/video$/, videoListView, 'home'],
   [/^#\/staff$/, staffView, 'home'],
+  [/^#\/genitori$/, misterParentsView, 'home'],
+  [/^#\/documenti$/, misterDocsView, 'home'],
+  [/^#\/pagamenti$/, misterPaymentsView, 'home'],
   [/^#\/partita\/nuova$/, (r) => matchEditView(r, null), 'partite'],
   [/^#\/partita\/([^/]+)\/modifica$/, (r, id) => matchEditView(r, id), 'partite'],
   [/^#\/partita\/([^/]+)\/live$/, liveView, 'partite'],
@@ -133,6 +139,9 @@ const playerRoutes = [
   [/^#\/g\/altro$/, playerMoreView, 'g-altro'],
   [/^#\/g\/calendario$/, playerCalendarView, 'g-cal'],
   [/^#\/g\/staff$/, playerStaffView, 'g-altro'],
+  [/^#\/g\/genitore$/, parentAreaView, 'g-altro'],
+  [/^#\/g\/documenti$/, playerDocsView, 'g-altro'],
+  [/^#\/g\/pagamenti$/, playerPaymentsView, 'g-altro'],
   [/^#\/g\/rose$/, playerRosterView, 'g-altro'],
   [/^#\/g\/marcatori$/, playerScorersView, 'g-altro'],
   [/^#\/g\/giocatore\/([^/]+)\/modifica$/, playerProfileEditView, 'g-altro'],
@@ -237,7 +246,7 @@ function setTab(tab) {
 
 // ---------- Avvio ----------
 
-export const APP_VERSION = '1.23.1';
+export const APP_VERSION = '1.24.0';
 let swReg = null;
 
 /** Controlla subito se c'è una versione nuova dell'app; restituisce true se è stata trovata. */
